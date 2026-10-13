@@ -227,7 +227,7 @@ const InternshipService = {
     if (!document.getElementById("applyModal")) {
       const modalHtml = `
         <div class="modal fade" id="applyModal" tabindex="-1" aria-labelledby="applyModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
               <div class="modal-header">
                 <div>
