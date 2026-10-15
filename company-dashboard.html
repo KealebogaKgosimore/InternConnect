@@ -37,8 +37,9 @@
     >+ Post an internship</button>
   </div>
 
-  <div class="alert alert-warning border-0">
-    <strong>Prototype notice:</strong> Sample records only. Posting and applicant management require backend integration.
+  <div id="companyStatusAlert" class="alert alert-success-subtle border border-success-subtle d-flex align-items-center gap-2 mb-4">
+    <span class="badge bg-success">● Live Connected</span>
+    <span>Connected to Supabase database. Real-time updates active.</span>
   </div>
 
   <!-- Stats row -->
@@ -46,25 +47,25 @@
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Active vacancies</span>
-        <div class="stat-number">03</div>
+        <div class="stat-number">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Applications</span>
-        <div class="stat-number">24</div>
+        <div class="stat-number">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Shortlisted</span>
-        <div class="stat-number">06</div>
+        <div class="stat-number">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Positions filled</span>
-        <div class="stat-number">02</div>
+        <div class="stat-number">--</div>
       </div>
     </div>
   </div>
@@ -83,27 +84,12 @@
             <th></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="companyListingsTbody">
           <tr>
-            <td class="fw-semibold">Software Development Intern</td>
-            <td>Gaborone</td>
-            <td>12</td>
-            <td><span class="status-badge status-open">Open</span></td>
-            <td><button class="btn btn-sm btn-outline-primary" onclick="alert('Demo only: applicant review will be connected to the backend.')">Review</button></td>
-          </tr>
-          <tr>
-            <td class="fw-semibold">IT Support Intern</td>
-            <td>Gaborone</td>
-            <td>8</td>
-            <td><span class="status-badge status-open">Open</span></td>
-            <td><button class="btn btn-sm btn-outline-primary" onclick="alert('Demo only: applicant review will be connected to the backend.')">Review</button></td>
-          </tr>
-          <tr>
-            <td class="fw-semibold">QA Testing Intern</td>
-            <td>Remote</td>
-            <td>4</td>
-            <td><span class="status-badge status-paused">Closing soon</span></td>
-            <td><button class="btn btn-sm btn-outline-primary" onclick="alert('Demo only: applicant review will be connected to the backend.')">Review</button></td>
+            <td colspan="5" class="text-center py-4 text-secondary">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+              Loading live internship listings...
+            </td>
           </tr>
         </tbody>
       </table>

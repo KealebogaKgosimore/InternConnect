@@ -60,11 +60,16 @@ const InternshipService = {
     }
   ],
 
+  appliedInternshipIds: new Map(),
+
   async init() {
-    // Check if user is logged in to compute real personal match scores
+    // Check if user is logged in to compute real personal match scores and check applied status
     if (window.AuthManager) {
       try {
         this.currentStudentProfile = await AuthManager.getCurrentProfile();
+        if (this.currentStudentProfile && this.currentStudentProfile.role === "student") {
+          await this.fetchUserApplications();
+        }
       } catch (e) {
         console.warn("Could not retrieve student profile for matching:", e);
       }
@@ -73,6 +78,38 @@ const InternshipService = {
     await this.fetchInternships();
     this.setupFilters();
     this.setupApplyModal();
+    this.setupRealtime();
+  },
+
+  async fetchUserApplications() {
+    const client = getSupabase();
+    if (!client || !this.currentStudentProfile) return;
+    try {
+      const { data, error } = await client
+        .from("applications")
+        .select("internship_id, status")
+        .eq("student_id", this.currentStudentProfile.id);
+      if (!error && data) {
+        this.appliedInternshipIds = new Map(data.map(a => [a.internship_id, a.status]));
+      }
+    } catch (e) {
+      console.debug("User applications load note:", e);
+    }
+  },
+
+  setupRealtime() {
+    const client = getSupabase();
+    if (!client || !isConfigured()) return;
+    try {
+      client
+        .channel("public:internships_live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "internships" }, () => {
+          this.fetchInternships();
+        })
+        .subscribe();
+    } catch (e) {
+      console.debug("Realtime note:", e);
+    }
   },
 
   async fetchInternships() {
@@ -86,7 +123,14 @@ const InternshipService = {
           .order("created_at", { ascending: false });
 
         if (!error && data && data.length > 0) {
-          this.allInternships = data;
+          // Deduplicate by title + company_name if duplicate seeds exist
+          const seen = new Set();
+          this.allInternships = data.filter(item => {
+            const key = `${(item.title || "").trim().toLowerCase()}-${(item.company_name || "").trim().toLowerCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
         } else {
           this.allInternships = this.fallbackListings;
         }
@@ -138,6 +182,8 @@ const InternshipService = {
       const avatarColors = ["", "avatar-green", "avatar-orange", "avatar-purple"];
       const colorClass = avatarColors[Math.abs(item.title.length) % avatarColors.length];
 
+      const appliedStatus = this.appliedInternshipIds.get(item.id);
+
       return `
         <div class="col-lg-6 internship-item" data-id="${item.id}" data-field="${item.field}" data-location="${item.location}">
           <div class="listing-card h-100 d-flex flex-column justify-content-between">
@@ -160,9 +206,12 @@ const InternshipService = {
             </div>
             <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-2">
               <span class="small text-secondary">${item.duration} · ${item.field}</span>
-              <button class="btn btn-outline-primary btn-sm view-apply-btn" onclick="InternshipService.openApplyModal('${item.id}')">
-                View & apply
-              </button>
+              ${appliedStatus 
+                ? `<span class="badge bg-success-subtle text-success border border-success-subtle py-2 px-3">✓ Applied (${appliedStatus.replace('_', ' ')})</span>`
+                : `<button class="btn btn-outline-primary btn-sm view-apply-btn" onclick="InternshipService.openApplyModal('${item.id}')">
+                    View & apply
+                   </button>`
+              }
             </div>
           </div>
         </div>
@@ -351,6 +400,9 @@ const InternshipService = {
         }
         throw error;
       }
+
+      this.appliedInternshipIds.set(internshipId, "submitted");
+      this.renderInternships(this.allInternships);
 
       alertBox.className = "alert alert-success";
       alertBox.textContent = "Application submitted successfully! Track your status on the Student Dashboard.";

@@ -11,144 +11,306 @@ const CoordinatorDashboard = {
 
   async init() {
     this.profile = await AuthManager.requireAuth(["coordinator", "admin"]);
+    this.renderHeader();
     await this.loadPlatformMetrics();
     await this.loadPlacements();
     this.setupActions();
+    this.setupRealtime();
   },
 
-  async loadPlatformMetrics() {
-    const client = getSupabase();
-    if (!client || !isConfigured()) return;
-
-    try {
-      // 1. Students count
-      const { count: studentCount } = await client
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "student");
-
-      // 2. Partner companies count
-      const { count: companyCount } = await client
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "company");
-
-      // 3. Placed/accepted count
-      const { count: placedCount } = await client
-        .from("applications")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "accepted");
-
-      // 4. Pending reports count
-      const { count: reportCount } = await client
-        .from("progress_reports")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
-
-      const statBoxes = document.querySelectorAll(".dashboard-stat .stat-number");
-      if (statBoxes.length >= 4) {
-        if (studentCount !== null) statBoxes[0].textContent = String(studentCount);
-        if (companyCount !== null) statBoxes[1].textContent = String(companyCount);
-        if (placedCount !== null) statBoxes[2].textContent = String(placedCount);
-        if (reportCount !== null) {
-          statBoxes[3].textContent = String(reportCount);
-          // Also update badge in action button
-          const badge = document.querySelector(".btn-outline-primary .badge");
-          if (badge) badge.textContent = String(reportCount);
-        }
-      }
-    } catch (err) {
-      console.warn("Metrics load error:", err);
+  renderHeader() {
+    if (!this.profile) return;
+    const alertBox = document.getElementById("coordinatorStatusAlert");
+    if (alertBox) {
+      alertBox.innerHTML = `
+        <span class="badge bg-success">● Live Connected</span>
+        <span>Signed in as Coordinator: <strong>${this.profile.full_name || "Coordinator"}</strong> (${this.profile.organisation || "Institution"}) · Full oversight active.</span>
+      `;
     }
   },
 
-  async loadPlacements() {
+  setupRealtime() {
     const client = getSupabase();
     if (!client || !isConfigured()) return;
+    try {
+      client
+        .channel("coordinator_live_dashboard")
+        .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => {
+          this.loadPlatformMetrics();
+          this.loadPlacements();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "progress_reports" }, () => {
+          this.loadPlatformMetrics();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+          this.loadPlatformMetrics();
+        })
+        .subscribe();
+    } catch (e) {
+      console.debug("Coordinator realtime note:", e);
+    }
+  },
+
+  setupActions() {
+    // 1. Export Report Buttons
+    const exportBtnTop = document.getElementById("btnExportReportTop");
+    if (exportBtnTop) exportBtnTop.addEventListener("click", () => this.exportCSV());
+
+    const exportBtnBottom = document.getElementById("btnExportReport");
+    if (exportBtnBottom) exportBtnBottom.addEventListener("click", () => this.exportCSV());
+
+    // 2. Review Placements Button
+    const reviewPlacementsBtn = document.getElementById("btnReviewPlacements");
+    if (reviewPlacementsBtn) reviewPlacementsBtn.addEventListener("click", () => this.openPlacementsModal());
+
+    // 3. Review Reports Button
+    const reviewReportsBtn = document.getElementById("btnReviewReports");
+    if (reviewReportsBtn) reviewReportsBtn.addEventListener("click", () => this.openReportsModal());
+
+    // 4. View Evaluations Button
+    const viewEvalsBtn = document.getElementById("btnViewEvaluations");
+    if (viewEvalsBtn) viewEvalsBtn.addEventListener("click", () => this.openEvaluationsModal());
+
+    this.injectReportsModal();
+    this.injectPlacementsModal();
+    this.injectEvaluationsModal();
+  },
+
+  injectPlacementsModal() {
+    if (!document.getElementById("coordinatorPlacementsModal")) {
+      const modalHtml = `
+        <div class="modal fade" id="coordinatorPlacementsModal" tabindex="-1" aria-labelledby="coordPlacLabel" aria-hidden="true">
+          <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <div>
+                  <h5 class="modal-title fw-bold" id="coordPlacLabel">All Student Applications & Placements</h5>
+                  <div class="text-secondary small">Live Supabase oversight · Update status or verify placements</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body p-0">
+                <div id="coordPlacementsListContainer" class="p-3"></div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML("beforeend", modalHtml);
+    }
+  },
+
+  async openPlacementsModal() {
+    const container = document.getElementById("coordPlacementsListContainer");
+    const modal = new bootstrap.Modal(document.getElementById("coordinatorPlacementsModal"));
+    modal.show();
+
+    const client = getSupabase();
+    if (!client || !isConfigured()) {
+      container.innerHTML = `<div class="alert alert-info">Supabase credentials required.</div>`;
+      return;
+    }
+
+    container.innerHTML = `<div class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2"></div>Loading live applications from Supabase...</div>`;
 
     try {
-      const { data, error } = await client
+      const { data: apps, error } = await client
         .from("applications")
         .select(`
           id,
           status,
           applied_at,
+          cover_note,
           profiles:student_id (
+            id,
+            full_name,
+            email,
+            phone,
+            programme,
+            skills,
+            cv_url
+          ),
+          internships:internship_id (
+            id,
+            title,
+            company_name,
+            location,
+            field
+          )
+        `)
+        .order("applied_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (!apps || apps.length === 0) {
+        container.innerHTML = `<div class="text-center py-4 text-secondary">No applications in the system yet. Once students apply, they appear here.</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Programme</th>
+                <th>Position & Company</th>
+                <th>Applied</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${apps.map(a => {
+                const student = a.profiles || {};
+                const internship = a.internships || {};
+                return `
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">${student.full_name || "Student"}</div>
+                      <small class="text-secondary">${student.email || ""}</small>
+                    </td>
+                    <td><small>${student.programme || "Undergraduate"}</small></td>
+                    <td>
+                      <div class="fw-semibold">${internship.title || "Internship"}</div>
+                      <small class="text-secondary">${internship.company_name || ""} (${internship.location || ""})</small>
+                    </td>
+                    <td><small class="text-secondary">${new Date(a.applied_at).toLocaleDateString()}</small></td>
+                    <td>
+                      <select class="form-select form-select-sm" onchange="CoordinatorDashboard.updateApplicationStatus('${a.id}', this.value)">
+                        <option value="submitted" ${a.status === 'submitted' ? 'selected' : ''}>Submitted</option>
+                        <option value="under_review" ${a.status === 'under_review' ? 'selected' : ''}>Under review</option>
+                        <option value="shortlisted" ${a.status === 'shortlisted' ? 'selected' : ''}>Shortlisted</option>
+                        <option value="accepted" ${a.status === 'accepted' ? 'selected' : ''}>Accepted (Placed)</option>
+                        <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                      </select>
+                    </td>
+                    <td>
+                      ${student.cv_url ? `<a href="${student.cv_url}" target="_blank" class="btn btn-sm btn-outline-success">View CV</a>` : `<span class="small text-muted">No CV</span>`}
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<div class="alert alert-danger">${err.message || "Failed to load placements."}</div>`;
+    }
+  },
+
+  async updateApplicationStatus(appId, newStatus) {
+    const client = getSupabase();
+    if (!client) return;
+    try {
+      const { error } = await client
+        .from("applications")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", appId);
+      if (error) throw error;
+      await this.loadPlatformMetrics();
+      await this.loadPlacements();
+    } catch (err) {
+      alert("Error updating application status: " + err.message);
+    }
+  },
+
+  injectEvaluationsModal() {
+    if (!document.getElementById("coordinatorEvalsModal")) {
+      const modalHtml = `
+        <div class="modal fade" id="coordinatorEvalsModal" tabindex="-1" aria-labelledby="coordEvalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <div>
+                  <h5 class="modal-title fw-bold" id="coordEvalLabel">Student & Placement Evaluations</h5>
+                  <div class="text-secondary small">Performance feedback and placement ratings</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <div id="coordEvalsListContainer">Loading live evaluations from Supabase...</div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML("beforeend", modalHtml);
+    }
+  },
+
+  async openEvaluationsModal() {
+    const container = document.getElementById("coordEvalsListContainer");
+    const modal = new bootstrap.Modal(document.getElementById("coordinatorEvalsModal"));
+    modal.show();
+
+    const client = getSupabase();
+    if (!client || !isConfigured()) {
+      container.innerHTML = `<div class="alert alert-info">Supabase credentials required.</div>`;
+      return;
+    }
+
+    try {
+      const { data: evals, error } = await client
+        .from("evaluations")
+        .select(`
+          id,
+          rating,
+          feedback,
+          created_at,
+          student:student_id (
             full_name,
             programme,
             email
           ),
-          internships:internship_id (
+          internship:internship_id (
             title,
-            company_name,
-            field
+            company_name
           )
         `)
-        .order("applied_at", { ascending: false })
-        .limit(25);
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
-      this.placements = data || [];
-      this.renderPlacementsTable(this.placements);
+
+      if (!evals || evals.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-4 text-secondary">
+            No formal evaluations submitted yet. Company mentors and coordinators can submit midterm and final evaluations.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = evals.map(ev => {
+        const student = ev.student || {};
+        const internship = ev.internship || {};
+        const stars = "★".repeat(ev.rating || 5) + "☆".repeat(Math.max(0, 5 - (ev.rating || 5)));
+        return `
+          <div class="card mb-3 border">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <h6 class="fw-bold mb-0">${student.full_name || "Student"}</h6>
+                  <small class="text-secondary">${internship.title || "Internship"} at ${internship.company_name || "Company"}</small>
+                </div>
+                <div class="text-warning fs-5" title="Rating: ${ev.rating || 5}/5">${stars}</div>
+              </div>
+              <p class="text-secondary small mb-2">${ev.feedback || "Satisfactory internship performance."}</p>
+              <div class="small text-muted">Submitted: ${new Date(ev.created_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
     } catch (err) {
-      console.warn("Placements table load error:", err);
+      container.innerHTML = `<div class="alert alert-danger">${err.message || "Failed to load evaluations."}</div>`;
     }
-  },
-
-  renderPlacementsTable(placements) {
-    const tableBody = document.querySelector(".table tbody");
-    if (!tableBody) return;
-
-    if (placements.length === 0) {
-      tableBody.innerHTML = `
-        <tr>
-          <td colspan="4" class="text-center py-4 text-secondary">
-            No placement applications recorded yet.
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    tableBody.innerHTML = placements.map(p => {
-      const student = p.profiles || {};
-      const internship = p.internships || {};
-      let badge = `<span class="status-badge status-review">Under review</span>`;
-      if (p.status === "accepted") badge = `<span class="status-badge status-open">Placed</span>`;
-      if (p.status === "shortlisted") badge = `<span class="status-badge status-shortlist">Shortlisted</span>`;
-
-      return `
-        <tr>
-          <td class="fw-semibold">${student.full_name || "Student"}</td>
-          <td>${student.programme || "Undergraduate"}</td>
-          <td>${internship.company_name || "Partner"}</td>
-          <td>${badge}</td>
-        </tr>
-      `;
-    }).join("");
-  },
-
-  setupActions() {
-    // 1. Export Report Button
-    const exportBtn = document.querySelector("button[onclick*='report export']");
-    if (exportBtn) {
-      exportBtn.removeAttribute("onclick");
-      exportBtn.addEventListener("click", () => this.exportCSV());
-    }
-
-    // 2. Action buttons
-    const actionButtons = document.querySelectorAll(".panel-card .d-grid button");
-    if (actionButtons.length >= 4) {
-      // Review progress reports button
-      actionButtons[1].removeAttribute("onclick");
-      actionButtons[1].addEventListener("click", () => this.openReportsModal());
-
-      // Generate programme report
-      actionButtons[3].removeAttribute("onclick");
-      actionButtons[3].addEventListener("click", () => this.exportCSV());
-    }
-
-    this.injectReportsModal();
   },
 
   injectReportsModal() {

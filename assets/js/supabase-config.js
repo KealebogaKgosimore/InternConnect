@@ -33,6 +33,20 @@ function getSupabase() {
   return _supabase;
 }
 
+async function testSupabaseConnection() {
+  if (!isConfigured()) return { ok: false, error: "Credentials not set" };
+  const client = getSupabase();
+  if (!client) return { ok: false, error: "Client initialization failed" };
+  try {
+    const { data, error } = await client.from("internships").select("id").limit(1);
+    if (error) throw error;
+    return { ok: true, data };
+  } catch (err) {
+    console.warn("Supabase connection check:", err);
+    return { ok: false, error: err.message };
+  }
+}
+
 // Display a helpful config notice if credentials are not yet pasted
 function showConfigBannerIfNeeded() {
   if (isConfigured()) return;
@@ -70,6 +84,11 @@ function showConfigBannerIfNeeded() {
   document.body.appendChild(notice);
 }
 
+window.isConfigured = isConfigured;
+window.getSupabase = getSupabase;
+window.testSupabaseConnection = testSupabaseConnection;
+
 document.addEventListener("DOMContentLoaded", () => {
   showConfigBannerIfNeeded();
 });
+

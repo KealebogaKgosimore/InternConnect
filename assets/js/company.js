@@ -15,6 +15,25 @@ const CompanyDashboard = {
     await this.loadDashboardData();
     this.setupPostForm();
     this.setupReviewModal();
+    this.setupRealtime();
+  },
+
+  setupRealtime() {
+    const client = getSupabase();
+    if (!client || !isConfigured()) return;
+    try {
+      client
+        .channel("company_live_dashboard")
+        .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => {
+          this.loadDashboardData();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "internships" }, () => {
+          this.loadDashboardData();
+        })
+        .subscribe();
+    } catch (e) {
+      console.debug("Company realtime note:", e);
+    }
   },
 
   renderHeader() {
@@ -22,6 +41,13 @@ const CompanyDashboard = {
     const title = document.querySelector("h1.h2");
     if (title) {
       title.textContent = `${this.profile.organisation || this.profile.full_name || "Company"} Dashboard`;
+    }
+    const alertBox = document.getElementById("companyStatusAlert");
+    if (alertBox) {
+      alertBox.innerHTML = `
+        <span class="badge bg-success">● Live Connected</span>
+        <span>Signed in as <strong>${this.profile.full_name || "Company Rep"}</strong> (${this.profile.organisation || "Partner Company"}) · Real-time pipeline active.</span>
+      `;
     }
   },
 

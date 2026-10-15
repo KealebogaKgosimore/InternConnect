@@ -129,6 +129,10 @@ DROP POLICY IF EXISTS "Public profiles read" ON public.profiles;
 CREATE POLICY "Public profiles read" ON public.profiles
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile" ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
@@ -146,6 +150,7 @@ DROP POLICY IF EXISTS "Companies can update own internships" ON public.internshi
 CREATE POLICY "Companies can update own internships" ON public.internships
   FOR UPDATE USING (
     auth.uid() = company_id OR
+    company_id IS NULL OR
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
   );
 
@@ -161,7 +166,11 @@ DROP POLICY IF EXISTS "Applications visible to owner, company, coordinator" ON p
 CREATE POLICY "Applications visible to owner, company, coordinator" ON public.applications
   FOR SELECT USING (
     student_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.internships WHERE internships.id = applications.internship_id AND internships.company_id = auth.uid()) OR
+    EXISTS (
+      SELECT 1 FROM public.internships 
+      WHERE internships.id = applications.internship_id 
+        AND (internships.company_id = auth.uid() OR internships.company_id IS NULL)
+    ) OR
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
   );
 
@@ -173,7 +182,11 @@ DROP POLICY IF EXISTS "Company and coordinator can update application status" ON
 CREATE POLICY "Company and coordinator can update application status" ON public.applications
   FOR UPDATE USING (
     student_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.internships WHERE internships.id = applications.internship_id AND internships.company_id = auth.uid()) OR
+    EXISTS (
+      SELECT 1 FROM public.internships 
+      WHERE internships.id = applications.internship_id 
+        AND (internships.company_id = auth.uid() OR internships.company_id IS NULL)
+    ) OR
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
   );
 
@@ -193,6 +206,29 @@ DROP POLICY IF EXISTS "Coordinators can update reports" ON public.progress_repor
 CREATE POLICY "Coordinators can update reports" ON public.progress_reports
   FOR UPDATE USING (
     student_id = auth.uid() OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+  );
+
+-- EVALUATIONS Policies
+DROP POLICY IF EXISTS "Evaluations visible to student, evaluator, and coordinator" ON public.evaluations;
+CREATE POLICY "Evaluations visible to student, evaluator, and coordinator" ON public.evaluations
+  FOR SELECT USING (
+    student_id = auth.uid() OR
+    evaluator_id = auth.uid() OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+  );
+
+DROP POLICY IF EXISTS "Evaluators and coordinators can create evaluations" ON public.evaluations;
+CREATE POLICY "Evaluators and coordinators can create evaluations" ON public.evaluations
+  FOR INSERT WITH CHECK (
+    auth.uid() = evaluator_id OR
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin', 'company'))
+  );
+
+DROP POLICY IF EXISTS "Evaluators can update own evaluations" ON public.evaluations;
+CREATE POLICY "Evaluators can update own evaluations" ON public.evaluations
+  FOR UPDATE USING (
+    evaluator_id = auth.uid() OR
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
   );
 
@@ -219,6 +255,8 @@ CREATE POLICY "Users can update/delete own resumes" ON storage.objects
 -- ====================================================================
 -- SAMPLE SEED DATA (INITIAL INTERNSHIP LISTINGS)
 -- ====================================================================
+CREATE UNIQUE INDEX IF NOT EXISTS uq_internships_title_company ON public.internships (title, company_name);
+
 INSERT INTO public.internships (company_name, title, field, location, duration, required_skills, description, status)
 VALUES
   (
@@ -281,4 +319,5 @@ VALUES
     'Collaborate with designers and front-end developers to craft interactive web layouts and modernize user interfaces.',
     'open'
   )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (title, company_name) DO NOTHING;
+

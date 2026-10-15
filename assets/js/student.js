@@ -14,9 +14,26 @@ const StudentDashboard = {
     if (this.profile) {
       this.renderProfileDetails();
       await this.loadApplications();
+      await this.loadReportStats();
+      this.setupRealtime();
     }
     this.setupProfileModal();
     this.setupReportModal();
+  },
+
+  setupRealtime() {
+    const client = getSupabase();
+    if (!client || !this.profile) return;
+    try {
+      client
+        .channel(`student_realtime_${this.profile.id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "applications", filter: `student_id=eq.${this.profile.id}` }, () => {
+          this.loadApplications();
+        })
+        .subscribe();
+    } catch (e) {
+      console.debug("Student realtime note:", e);
+    }
   },
 
   renderProfileDetails() {
@@ -26,6 +43,15 @@ const StudentDashboard = {
     const greeting = document.querySelector("h1.h2");
     if (greeting) {
       greeting.textContent = `Good morning, ${this.profile.full_name || "Student"}`;
+    }
+
+    // Update status alert
+    const statusAlert = document.getElementById("studentStatusAlert");
+    if (statusAlert) {
+      statusAlert.innerHTML = `
+        <span class="badge bg-success">● Live Connected</span>
+        <span>Signed in as <strong>${this.profile.full_name || "Student"}</strong> (${this.profile.email}) · Programme: <strong>${this.profile.programme || "Not specified"}</strong></span>
+      `;
     }
 
     // Profile Completion Calculation
@@ -90,6 +116,25 @@ const StudentDashboard = {
       this.updateStatCounters(this.applications);
     } catch (err) {
       console.warn("Error fetching applications:", err);
+    }
+  },
+
+  async loadReportStats() {
+    const client = getSupabase();
+    if (!client || !this.profile) return;
+    try {
+      const { count, error } = await client
+        .from("progress_reports")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", this.profile.id);
+      if (!error && count !== null) {
+        const statBoxes = document.querySelectorAll(".dashboard-stat .stat-number");
+        if (statBoxes.length >= 4) {
+          statBoxes[3].textContent = String(count).padStart(2, "0");
+        }
+      }
+    } catch (e) {
+      console.debug("Error loading report count:", e);
     }
   },
 

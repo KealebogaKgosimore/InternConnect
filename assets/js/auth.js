@@ -27,11 +27,11 @@ const AuthManager = {
       .from("profiles")
       .select("*")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       // Fallback to metadata
-      return {
+      const profileData = {
         id: user.id,
         email: user.email,
         full_name: user.user_metadata?.full_name || "User",
@@ -40,6 +40,12 @@ const AuthManager = {
         skills: user.user_metadata?.skills || "",
         programme: user.user_metadata?.programme || ""
       };
+      try {
+        await client.from("profiles").upsert(profileData);
+      } catch (e) {
+        console.warn("Auto-upsert profile note:", e);
+      }
+      return profileData;
     }
     return data;
   },
@@ -244,6 +250,17 @@ document.addEventListener("DOMContentLoaded", () => {
         submitBtn.textContent = "Log in";
       }
     });
+
+    // Handle redirect parameter notice on login page
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("redirect")) {
+      const notice = document.getElementById("loginNotice");
+      if (notice) {
+        notice.className = "alert alert-warning";
+        notice.textContent = "Please sign in to access your protected dashboard.";
+        notice.classList.remove("d-none");
+      }
+    }
   }
 
   // Handle Log Out Buttons everywhere
@@ -253,4 +270,60 @@ document.addEventListener("DOMContentLoaded", () => {
       AuthManager.logout();
     });
   });
+
+  // Sync navigation bar if logged in on public pages
+  AuthManager.syncNavbarState();
 });
+
+// Update public navigation bar with live user session
+AuthManager.syncNavbarState = async function() {
+  if (!isConfigured()) return;
+  try {
+    const profile = await AuthManager.getCurrentProfile();
+    if (!profile) return;
+
+    const navList = document.querySelector(".navbar-nav");
+    if (!navList) return;
+
+    // Remove old login/register links
+    const loginLi = navList.querySelector("a[href='login.html']");
+    const regLi = navList.querySelector("a[href='register.html']");
+    if (loginLi && loginLi.parentElement) loginLi.parentElement.remove();
+    if (regLi && regLi.parentElement) regLi.parentElement.remove();
+
+    const destinations = {
+      student: "student-dashboard.html",
+      company: "company-dashboard.html",
+      coordinator: "coordinator-dashboard.html",
+      admin: "coordinator-dashboard.html"
+    };
+
+    const targetDashboard = destinations[profile.role] || "student-dashboard.html";
+    const displayName = (profile.full_name || "Account").split(" ")[0];
+
+    const userHtml = `
+      <li class="nav-item ms-lg-2 dropdown">
+        <a class="btn btn-outline-primary px-3 d-flex align-items-center gap-2" href="${targetDashboard}">
+          <span>Dashboard (${displayName})</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <button class="btn btn-sm btn-outline-secondary px-3 py-2 ms-lg-1" data-action="logout">Log out</button>
+      </li>
+    `;
+
+    navList.insertAdjacentHTML("beforeend", userHtml);
+
+    // Wire up new logout button
+    const newLogout = navList.querySelector("[data-action='logout']");
+    if (newLogout) {
+      newLogout.addEventListener("click", (e) => {
+        e.preventDefault();
+        AuthManager.logout();
+      });
+    }
+  } catch (err) {
+    console.debug("Navbar sync error:", err);
+  }
+};
+
