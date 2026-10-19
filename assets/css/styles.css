@@ -81,6 +81,26 @@ footer,
   box-shadow: 0 5px 16px rgb(169 154 245 / 20%);
 }
 
+.brand-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(169, 154, 245, 0.2);
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.brand-icon-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(169, 154, 245, 0.25);
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+
 .btn-primary {
   --bs-btn-color: #171522;
   --bs-btn-bg: #b3a7fa;
