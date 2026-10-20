@@ -23,15 +23,18 @@ const CoordinatorDashboard = {
     const alertBox = document.getElementById("coordinatorStatusAlert");
     if (alertBox) {
       alertBox.innerHTML = `
-        <span class="badge bg-success">● Live Connected</span>
-        <span>Signed in as Coordinator: <strong>${this.profile.full_name || "Coordinator"}</strong> (${this.profile.organisation || "Institution"}) · Full oversight active.</span>
+        <span class="badge bg-secondary">● Connecting…</span>
+        <span>Signed in as Coordinator: <strong>${this.profile.full_name || "Coordinator"}</strong> (${this.profile.organisation || "Institution"}).</span>
       `;
     }
   },
 
   setupRealtime() {
     const client = getSupabase();
-    if (!client || !isConfigured()) return;
+    if (!client || !isConfigured() || !this.profile) {
+      setRealtimeStatus("coordinatorStatusAlert", "NOT_CONFIGURED");
+      return;
+    }
     try {
       client
         .channel("coordinator_live_dashboard")
@@ -45,9 +48,10 @@ const CoordinatorDashboard = {
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
           this.loadPlatformMetrics();
         })
-        .subscribe();
+        .subscribe(status => setRealtimeStatus("coordinatorStatusAlert", status));
     } catch (e) {
-      console.debug("Coordinator realtime note:", e);
+      setRealtimeStatus("coordinatorStatusAlert", "ERROR");
+      console.error("Coordinator realtime subscription failed:", e);
     }
   },
 
@@ -189,7 +193,7 @@ const CoordinatorDashboard = {
                       </select>
                     </td>
                     <td>
-                      ${student.cv_url ? `<a href="${student.cv_url}" target="_blank" class="btn btn-sm btn-outline-success">View CV</a>` : `<span class="small text-muted">No CV</span>`}
+                      ${student.cv_url ? `<a href="#" data-resume-path="${escapeHtml(student.cv_url)}" class="btn btn-sm btn-outline-success">View CV</a>` : `<span class="small text-muted">No CV</span>`}
                     </td>
                   </tr>
                 `;

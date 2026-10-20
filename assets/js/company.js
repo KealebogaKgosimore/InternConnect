@@ -20,7 +20,10 @@ const CompanyDashboard = {
 
   setupRealtime() {
     const client = getSupabase();
-    if (!client || !isConfigured()) return;
+    if (!client || !isConfigured() || !this.profile) {
+      setRealtimeStatus("companyStatusAlert", "NOT_CONFIGURED");
+      return;
+    }
     try {
       client
         .channel("company_live_dashboard")
@@ -30,9 +33,10 @@ const CompanyDashboard = {
         .on("postgres_changes", { event: "*", schema: "public", table: "internships" }, () => {
           this.loadDashboardData();
         })
-        .subscribe();
+        .subscribe(status => setRealtimeStatus("companyStatusAlert", status));
     } catch (e) {
-      console.debug("Company realtime note:", e);
+      setRealtimeStatus("companyStatusAlert", "ERROR");
+      console.error("Company realtime subscription failed:", e);
     }
   },
 
@@ -45,8 +49,8 @@ const CompanyDashboard = {
     const alertBox = document.getElementById("companyStatusAlert");
     if (alertBox) {
       alertBox.innerHTML = `
-        <span class="badge bg-success">● Live Connected</span>
-        <span>Signed in as <strong>${this.profile.full_name || "Company Rep"}</strong> (${this.profile.organisation || "Partner Company"}) · Real-time pipeline active.</span>
+        <span class="badge bg-secondary">● Connecting…</span>
+        <span>Signed in as <strong>${this.profile.full_name || "Company Rep"}</strong> (${this.profile.organisation || "Partner Company"}).</span>
       `;
     }
   },
@@ -304,7 +308,7 @@ const CompanyDashboard = {
               ${app.cover_note ? `<div class="p-2 bg-light rounded small mb-2"><em>"${app.cover_note}"</em></div>` : ''}
               <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                 <span class="small text-secondary">Applied: ${new Date(app.applied_at).toLocaleDateString()}</span>
-                ${student.cv_url ? `<a href="${student.cv_url}" target="_blank" class="btn btn-sm btn-outline-success">View Attached CV &rarr;</a>` : '<span class="small text-muted">No CV attached</span>'}
+                ${student.cv_url ? `<a href="#" data-resume-path="${escapeHtml(student.cv_url)}" class="btn btn-sm btn-outline-success">View Attached CV &rarr;</a>` : '<span class="small text-muted">No CV attached</span>'}
               </div>
             </div>
           </div>

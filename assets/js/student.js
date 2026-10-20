@@ -23,16 +23,20 @@ const StudentDashboard = {
 
   setupRealtime() {
     const client = getSupabase();
-    if (!client || !this.profile) return;
+    if (!client || !isConfigured() || !this.profile) {
+      setRealtimeStatus("studentStatusAlert", "NOT_CONFIGURED");
+      return;
+    }
     try {
       client
         .channel(`student_realtime_${this.profile.id}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "applications", filter: `student_id=eq.${this.profile.id}` }, () => {
           this.loadApplications();
         })
-        .subscribe();
+        .subscribe(status => setRealtimeStatus("studentStatusAlert", status));
     } catch (e) {
-      console.debug("Student realtime note:", e);
+      setRealtimeStatus("studentStatusAlert", "ERROR");
+      console.error("Student realtime subscription failed:", e);
     }
   },
 
@@ -49,7 +53,7 @@ const StudentDashboard = {
     const statusAlert = document.getElementById("studentStatusAlert");
     if (statusAlert) {
       statusAlert.innerHTML = `
-        <span class="badge bg-success">● Live Connected</span>
+        <span class="badge bg-secondary">● Connecting…</span>
         <span>Signed in as <strong>${this.profile.full_name || "Student"}</strong> (${this.profile.email}) · Programme: <strong>${this.profile.programme || "Not specified"}</strong></span>
       `;
     }
@@ -77,7 +81,7 @@ const StudentDashboard = {
       // 2: Skills
       checklist[2].innerHTML = `<span class="${this.profile.skills ? 'check-done' : 'check-pending'}">${this.profile.skills ? '✓' : '•'}</span> Add skills and interests`;
       // 3: CV upload
-      checklist[3].innerHTML = `<span class="${this.profile.cv_url ? 'check-done' : 'check-pending'}">${this.profile.cv_url ? '✓' : '•'}</span> ${this.profile.cv_url ? '<a href="' + this.profile.cv_url + '" target="_blank" class="text-success fw-semibold">CV Uploaded (View)</a>' : 'Upload your CV'}`;
+      checklist[3].innerHTML = `<span class="${this.profile.cv_url ? 'check-done' : 'check-pending'}">${this.profile.cv_url ? '✓' : '•'}</span> ${this.profile.cv_url ? `<a href="#" data-resume-path="${escapeHtml(this.profile.cv_url)}" class="text-success fw-semibold">CV Uploaded (View)</a>` : 'Upload your CV'}`;
     }
 
     // Pre-fill profile modal inputs if open
@@ -258,17 +262,8 @@ const StudentDashboard = {
           .from("resumes")
           .upload(filePath, file, { upsert: true });
 
-        if (uploadError) {
-          console.warn("Storage upload note:", uploadError);
-          if (uploadError.message?.toLowerCase().includes("bucket")) {
-            alert("To enable CV uploads: Create a public bucket named 'resumes' in your Supabase Dashboard under Storage. Other profile changes are still being saved.");
-          }
-        } else {
-          const { data: publicUrlData } = client.storage
-            .from("resumes")
-            .getPublicUrl(filePath);
-          if (publicUrlData) cvUrl = publicUrlData.publicUrl;
-        }
+        if (uploadError) throw uploadError;
+        cvUrl = filePath;
       }
 
       // 2. Update profile table in Supabase

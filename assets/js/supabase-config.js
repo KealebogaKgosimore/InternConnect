@@ -33,6 +33,72 @@ function getSupabase() {
   return _supabase;
 }
 
+function setRealtimeStatus(elementId, status) {
+  const alertBox = document.getElementById(elementId);
+  const badge = alertBox?.querySelector(".badge");
+  if (!badge) return;
+
+  const states = {
+    SUBSCRIBED: ["bg-success", "● Realtime active", "alert-success-subtle border-success-subtle"],
+    CHANNEL_ERROR: ["bg-danger", "● Realtime error", "alert-danger-subtle border-danger-subtle"],
+    TIMED_OUT: ["bg-warning text-dark", "● Realtime timed out", "alert-warning-subtle border-warning-subtle"],
+    CLOSED: ["bg-secondary", "● Realtime disconnected", "alert-secondary border-secondary"],
+    NOT_CONFIGURED: ["bg-secondary", "● Not configured", "alert-warning-subtle border-warning-subtle"],
+    ERROR: ["bg-danger", "● Realtime error", "alert-danger-subtle border-danger-subtle"]
+  };
+  const [badgeClass, label, alertClass] = states[status] || [
+    "bg-secondary",
+    "● Connecting…",
+    "alert-secondary border-secondary"
+  ];
+  badge.className = `badge ${badgeClass}`;
+  badge.textContent = label;
+  alertBox.classList.remove(
+    "alert-success-subtle",
+    "border-success-subtle",
+    "alert-danger-subtle",
+    "border-danger-subtle",
+    "alert-warning-subtle",
+    "border-warning-subtle",
+    "alert-secondary",
+    "border-secondary"
+  );
+  alertBox.classList.add(...alertClass.split(" "));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+async function openResume(path) {
+  const client = getSupabase();
+  if (!client || !isConfigured()) throw new Error("Supabase is not configured.");
+
+  const resumeWindow = window.open("about:blank", "_blank");
+  try {
+    const { data, error } = await client.storage
+      .from("resumes")
+      .createSignedUrl(path, 60);
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error("Could not create a secure CV link.");
+    if (resumeWindow) {
+      resumeWindow.opener = null;
+      resumeWindow.location = data.signedUrl;
+    } else {
+      window.location.assign(data.signedUrl);
+    }
+  } catch (error) {
+    resumeWindow?.close();
+    throw error;
+  }
+}
+
 async function testSupabaseConnection() {
   if (!isConfigured()) return { ok: false, error: "Credentials not set" };
   const client = getSupabase();
@@ -87,8 +153,22 @@ function showConfigBannerIfNeeded() {
 window.isConfigured = isConfigured;
 window.getSupabase = getSupabase;
 window.testSupabaseConnection = testSupabaseConnection;
+window.setRealtimeStatus = setRealtimeStatus;
+window.escapeHtml = escapeHtml;
+window.openResume = openResume;
+
+document.addEventListener("click", async event => {
+  const link = event.target.closest("[data-resume-path]");
+  if (!link) return;
+  event.preventDefault();
+  try {
+    await openResume(link.dataset.resumePath);
+  } catch (error) {
+    console.error("Unable to open CV:", error);
+    alert(error.message || "Unable to open the CV.");
+  }
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   showConfigBannerIfNeeded();
 });
-

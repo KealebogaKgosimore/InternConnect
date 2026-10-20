@@ -166,6 +166,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const password = document.getElementById("regPassword").value;
       const confirm = document.getElementById("confirmPassword").value;
 
+      if (!["student", "company"].includes(role)) {
+        notice.className = "alert alert-warning";
+        notice.textContent = "Choose Student or Company / organisation. Coordinator and administrator accounts must be assigned by an administrator.";
+        notice.classList.remove("d-none");
+        return;
+      }
+
       if (password !== confirm) {
         document.getElementById("confirmPassword").setCustomValidity("Passwords do not match.");
         document.getElementById("confirmPassword").reportValidity();
@@ -326,4 +333,3 @@ AuthManager.syncNavbarState = async function() {
     console.debug("Navbar sync error:", err);
   }
 };
-

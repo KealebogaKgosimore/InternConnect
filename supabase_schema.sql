@@ -94,7 +94,11 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
+    CASE
+      WHEN NEW.raw_user_meta_data->>'role' IN ('student', 'company')
+        THEN NEW.raw_user_meta_data->>'role'
+      ELSE 'student'
+    END,
     COALESCE(NEW.raw_user_meta_data->>'phone', ''),
     COALESCE(NEW.raw_user_meta_data->>'organisation', ''),
     COALESCE(NEW.raw_user_meta_data->>'programme', ''),
@@ -124,133 +128,261 @@ ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.progress_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.evaluations ENABLE ROW LEVEL SECURITY;
 
--- PROFILES Policies
+-- Role- and ownership-scoped access rules.
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS TEXT
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT p.role FROM public.profiles AS p WHERE p.id = auth.uid()
+$$;
+REVOKE ALL ON FUNCTION public.current_user_role() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.prevent_profile_role_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND NEW.role IS DISTINCT FROM OLD.role THEN
+    RAISE EXCEPTION 'Account roles can only be changed by an administrator';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+-- Treat previously self-assignable privileged roles as untrusted until an administrator reassigns them.
+UPDATE public.profiles SET role = 'student' WHERE role IN ('coordinator', 'admin');
+DROP TRIGGER IF EXISTS prevent_profile_role_change ON public.profiles;
+CREATE TRIGGER prevent_profile_role_change
+  BEFORE UPDATE OF role ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_profile_role_change();
+
 DROP POLICY IF EXISTS "Public profiles read" ON public.profiles;
-CREATE POLICY "Public profiles read" ON public.profiles
-  FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
-CREATE POLICY "Users can insert own profile" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles visible to owner and relevant staff" ON public.profiles;
+CREATE POLICY "Profiles visible to owner and relevant staff" ON public.profiles
+  FOR SELECT USING (
+    id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
+    OR EXISTS (
+      SELECT 1
+      FROM public.applications AS a
+      JOIN public.internships AS i ON i.id = a.internship_id
+      WHERE a.student_id = profiles.id AND i.company_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can insert own profile" ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id AND role IN ('student', 'company'));
 CREATE POLICY "Users can update own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
--- INTERNSHIPS Policies
 DROP POLICY IF EXISTS "Anyone can read internships" ON public.internships;
+DROP POLICY IF EXISTS "Companies and admins can create internships" ON public.internships;
+DROP POLICY IF EXISTS "Companies can update own internships" ON public.internships;
+DROP POLICY IF EXISTS "Companies can delete own internships" ON public.internships;
+DROP POLICY IF EXISTS "Companies can create internships" ON public.internships;
 CREATE POLICY "Anyone can read internships" ON public.internships
   FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Companies and admins can create internships" ON public.internships;
-CREATE POLICY "Companies and admins can create internships" ON public.internships
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
-DROP POLICY IF EXISTS "Companies can update own internships" ON public.internships;
+CREATE POLICY "Companies can create internships" ON public.internships
+  FOR INSERT WITH CHECK (
+    (public.current_user_role() = 'company' AND company_id = auth.uid())
+    OR public.current_user_role() IN ('coordinator', 'admin')
+  );
 CREATE POLICY "Companies can update own internships" ON public.internships
   FOR UPDATE USING (
-    auth.uid() = company_id OR
-    company_id IS NULL OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+    (public.current_user_role() = 'company' AND company_id = auth.uid())
+    OR public.current_user_role() IN ('coordinator', 'admin')
+  ) WITH CHECK (
+    (public.current_user_role() = 'company' AND company_id = auth.uid())
+    OR public.current_user_role() IN ('coordinator', 'admin')
   );
-
-DROP POLICY IF EXISTS "Companies can delete own internships" ON public.internships;
 CREATE POLICY "Companies can delete own internships" ON public.internships
   FOR DELETE USING (
-    auth.uid() = company_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+    (public.current_user_role() = 'company' AND company_id = auth.uid())
+    OR public.current_user_role() IN ('coordinator', 'admin')
   );
 
--- APPLICATIONS Policies
 DROP POLICY IF EXISTS "Applications visible to owner, company, coordinator" ON public.applications;
-CREATE POLICY "Applications visible to owner, company, coordinator" ON public.applications
-  FOR SELECT USING (
-    student_id = auth.uid() OR
-    EXISTS (
-      SELECT 1 FROM public.internships 
-      WHERE internships.id = applications.internship_id 
-        AND (internships.company_id = auth.uid() OR internships.company_id IS NULL)
-    ) OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
-  );
-
 DROP POLICY IF EXISTS "Students can apply" ON public.applications;
-CREATE POLICY "Students can apply" ON public.applications
-  FOR INSERT WITH CHECK (auth.uid() = student_id);
-
 DROP POLICY IF EXISTS "Company and coordinator can update application status" ON public.applications;
-CREATE POLICY "Company and coordinator can update application status" ON public.applications
-  FOR UPDATE USING (
-    student_id = auth.uid() OR
-    EXISTS (
-      SELECT 1 FROM public.internships 
-      WHERE internships.id = applications.internship_id 
-        AND (internships.company_id = auth.uid() OR internships.company_id IS NULL)
-    ) OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
-  );
-
--- PROGRESS REPORTS Policies
-DROP POLICY IF EXISTS "Reports visible to student and coordinators" ON public.progress_reports;
-CREATE POLICY "Reports visible to student and coordinators" ON public.progress_reports
+DROP POLICY IF EXISTS "Applications visible to relevant users" ON public.applications;
+DROP POLICY IF EXISTS "Students can apply to open internships" ON public.applications;
+DROP POLICY IF EXISTS "Companies and coordinators can review applications" ON public.applications;
+CREATE POLICY "Applications visible to relevant users" ON public.applications
   FOR SELECT USING (
-    student_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+    student_id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
+    OR EXISTS (
+      SELECT 1 FROM public.internships AS i
+      WHERE i.id = applications.internship_id AND i.company_id = auth.uid()
+    )
   );
-
-DROP POLICY IF EXISTS "Students can insert own reports" ON public.progress_reports;
-CREATE POLICY "Students can insert own reports" ON public.progress_reports
-  FOR INSERT WITH CHECK (auth.uid() = student_id);
-
-DROP POLICY IF EXISTS "Coordinators can update reports" ON public.progress_reports;
-CREATE POLICY "Coordinators can update reports" ON public.progress_reports
-  FOR UPDATE USING (
-    student_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
-  );
-
--- EVALUATIONS Policies
-DROP POLICY IF EXISTS "Evaluations visible to student, evaluator, and coordinator" ON public.evaluations;
-CREATE POLICY "Evaluations visible to student, evaluator, and coordinator" ON public.evaluations
-  FOR SELECT USING (
-    student_id = auth.uid() OR
-    evaluator_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
-  );
-
-DROP POLICY IF EXISTS "Evaluators and coordinators can create evaluations" ON public.evaluations;
-CREATE POLICY "Evaluators and coordinators can create evaluations" ON public.evaluations
+CREATE POLICY "Students can apply to open internships" ON public.applications
   FOR INSERT WITH CHECK (
-    auth.uid() = evaluator_id OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin', 'company'))
+    student_id = auth.uid()
+    AND public.current_user_role() = 'student'
+    AND EXISTS (
+      SELECT 1 FROM public.internships AS i
+      WHERE i.id = applications.internship_id AND i.status = 'open'
+    )
   );
-
-DROP POLICY IF EXISTS "Evaluators can update own evaluations" ON public.evaluations;
-CREATE POLICY "Evaluators can update own evaluations" ON public.evaluations
+CREATE POLICY "Companies and coordinators can review applications" ON public.applications
   FOR UPDATE USING (
-    evaluator_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('coordinator', 'admin'))
+    public.current_user_role() IN ('coordinator', 'admin')
+    OR (public.current_user_role() = 'company' AND EXISTS (
+      SELECT 1 FROM public.internships AS i
+      WHERE i.id = applications.internship_id AND i.company_id = auth.uid()
+    ))
+  ) WITH CHECK (
+    public.current_user_role() IN ('coordinator', 'admin')
+    OR (public.current_user_role() = 'company' AND EXISTS (
+      SELECT 1 FROM public.internships AS i
+      WHERE i.id = applications.internship_id AND i.company_id = auth.uid()
+    ))
+  );
+REVOKE UPDATE ON public.applications FROM authenticated;
+GRANT UPDATE (status, updated_at) ON public.applications TO authenticated;
+
+DROP POLICY IF EXISTS "Reports visible to student and coordinators" ON public.progress_reports;
+DROP POLICY IF EXISTS "Students can insert own reports" ON public.progress_reports;
+DROP POLICY IF EXISTS "Coordinators can update reports" ON public.progress_reports;
+DROP POLICY IF EXISTS "Students and coordinators can view reports" ON public.progress_reports;
+DROP POLICY IF EXISTS "Students can submit own reports" ON public.progress_reports;
+DROP POLICY IF EXISTS "Coordinators can review reports" ON public.progress_reports;
+CREATE POLICY "Students and coordinators can view reports" ON public.progress_reports
+  FOR SELECT USING (
+    student_id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
+  );
+CREATE POLICY "Students can submit own reports" ON public.progress_reports
+  FOR INSERT WITH CHECK (
+    student_id = auth.uid() AND public.current_user_role() = 'student'
+  );
+CREATE POLICY "Coordinators can review reports" ON public.progress_reports
+  FOR UPDATE USING (public.current_user_role() IN ('coordinator', 'admin'))
+  WITH CHECK (public.current_user_role() IN ('coordinator', 'admin'));
+REVOKE UPDATE ON public.progress_reports FROM authenticated;
+GRANT UPDATE (coordinator_feedback, status, reviewed_at) ON public.progress_reports TO authenticated;
+
+DROP POLICY IF EXISTS "Evaluations visible to student, evaluator, and coordinator" ON public.evaluations;
+DROP POLICY IF EXISTS "Evaluators and coordinators can create evaluations" ON public.evaluations;
+DROP POLICY IF EXISTS "Evaluators can update own evaluations" ON public.evaluations;
+DROP POLICY IF EXISTS "Evaluations visible to relevant users" ON public.evaluations;
+DROP POLICY IF EXISTS "Companies and coordinators can create evaluations" ON public.evaluations;
+DROP POLICY IF EXISTS "Evaluators and coordinators can update evaluations" ON public.evaluations;
+CREATE POLICY "Evaluations visible to relevant users" ON public.evaluations
+  FOR SELECT USING (
+    student_id = auth.uid()
+    OR evaluator_id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
+    OR EXISTS (
+      SELECT 1 FROM public.internships AS i
+      WHERE i.id = evaluations.internship_id AND i.company_id = auth.uid()
+    )
+  );
+CREATE POLICY "Companies and coordinators can create evaluations" ON public.evaluations
+  FOR INSERT WITH CHECK (
+    public.current_user_role() IN ('coordinator', 'admin')
+    OR (
+      public.current_user_role() = 'company'
+      AND evaluator_id = auth.uid()
+      AND EXISTS (
+        SELECT 1 FROM public.internships AS i
+        WHERE i.id = evaluations.internship_id AND i.company_id = auth.uid()
+      )
+    )
+  );
+CREATE POLICY "Evaluators and coordinators can update evaluations" ON public.evaluations
+  FOR UPDATE USING (
+    evaluator_id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
+  ) WITH CHECK (
+    evaluator_id = auth.uid()
+    OR public.current_user_role() IN ('coordinator', 'admin')
   );
 
 -- ====================================================================
 -- SUPABASE STORAGE BUCKET FOR RESUMES / CVS
 -- ====================================================================
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('resumes', 'resumes', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+VALUES ('resumes', 'resumes', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
 
 -- Storage object access policies
 DROP POLICY IF EXISTS "Public read resumes" ON storage.objects;
-CREATE POLICY "Public read resumes" ON storage.objects
-  FOR SELECT USING (bucket_id = 'resumes');
-
 DROP POLICY IF EXISTS "Authenticated users can upload resumes" ON storage.objects;
-CREATE POLICY "Authenticated users can upload resumes" ON storage.objects
-  FOR INSERT WITH CHECK (bucket_id = 'resumes' AND auth.role() = 'authenticated');
-
 DROP POLICY IF EXISTS "Users can update/delete own resumes" ON storage.objects;
-CREATE POLICY "Users can update/delete own resumes" ON storage.objects
-  FOR UPDATE USING (bucket_id = 'resumes' AND auth.uid() = owner);
+DROP POLICY IF EXISTS "Users can read permitted resumes" ON storage.objects;
+DROP POLICY IF EXISTS "Students can upload own resumes" ON storage.objects;
+DROP POLICY IF EXISTS "Students can update own resumes" ON storage.objects;
+DROP POLICY IF EXISTS "Students can delete own resumes" ON storage.objects;
+CREATE POLICY "Users can read permitted resumes" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'resumes' AND (
+      name LIKE 'resumes/' || auth.uid()::text || '-%'
+      OR public.current_user_role() IN ('coordinator', 'admin')
+      OR EXISTS (
+        SELECT 1
+        FROM public.applications AS a
+        JOIN public.internships AS i ON i.id = a.internship_id
+        WHERE i.company_id = auth.uid()
+          AND name LIKE 'resumes/' || a.student_id::text || '-%'
+      )
+    )
+  );
+CREATE POLICY "Students can upload own resumes" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'resumes'
+    AND public.current_user_role() = 'student'
+    AND name LIKE 'resumes/' || auth.uid()::text || '-%'
+  );
+CREATE POLICY "Students can update own resumes" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'resumes'
+    AND public.current_user_role() = 'student'
+    AND name LIKE 'resumes/' || auth.uid()::text || '-%'
+  ) WITH CHECK (
+    bucket_id = 'resumes'
+    AND public.current_user_role() = 'student'
+    AND name LIKE 'resumes/' || auth.uid()::text || '-%'
+  );
+CREATE POLICY "Students can delete own resumes" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'resumes'
+    AND public.current_user_role() = 'student'
+    AND name LIKE 'resumes/' || auth.uid()::text || '-%'
+  );
+
+-- Convert previously stored public URLs to private-bucket object paths.
+UPDATE public.profiles
+SET cv_url = regexp_replace(cv_url, '^https?://[^/]+/storage/v1/object/public/resumes/', '')
+WHERE cv_url ~ '^https?://[^/]+/storage/v1/object/public/resumes/';
+
+-- Make the tables watched by the dashboards available to Supabase Realtime.
+DO $$
+DECLARE
+  table_name TEXT;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    FOREACH table_name IN ARRAY ARRAY['internships', 'applications', 'progress_reports', 'profiles']
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = table_name
+      ) THEN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', table_name);
+      END IF;
+    END LOOP;
+  END IF;
+END;
+$$;
 
 -- ====================================================================
 -- SAMPLE SEED DATA (INITIAL INTERNSHIP LISTINGS)
@@ -320,4 +452,3 @@ VALUES
     'open'
   )
 ON CONFLICT (title, company_name) DO NOTHING;
-
