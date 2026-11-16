@@ -19,37 +19,39 @@
 </nav>
 <main class="container py-5">
   <span class="eyebrow">Institution workspace</span>
-  <h1 class="h2 fw-bold mt-2 mb-1">Coordinator dashboard</h1>
-  <p class="text-secondary mb-4">Oversee applications, placements, and student progress across the internship programme.</p>
+  <h1 class="h2 fw-bold mt-2 mb-1" id="coordinatorTitle">Coordinator dashboard</h1>
+  <p class="text-secondary mb-4" id="coordinatorSubtitle">Oversee applications, placements, and student progress across the internship programme.</p>
   
   <div id="coordinatorStatusAlert" class="alert alert-success-subtle border border-success-subtle d-flex align-items-center gap-2 mb-4">
     <span class="badge bg-secondary">● Connecting…</span>
     <span>Checking the live institutional update connection.</span>
   </div>
 
+  <div id="coordinatorNotice" class="alert d-none mb-4" role="alert"></div>
+
   <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
-        <span class="stat-label">Registered students</span>
-        <div class="stat-number">--</div>
+        <span class="stat-label">Institution students</span>
+        <div class="stat-number" id="statStudentsCount">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
-        <span class="stat-label">Partner companies</span>
-        <div class="stat-number">--</div>
+        <span class="stat-label">Applications received</span>
+        <div class="stat-number" id="statApplicationsCount">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Active placements</span>
-        <div class="stat-number">--</div>
+        <div class="stat-number" id="statPlacementsCount">--</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="dashboard-stat">
         <span class="stat-label">Reports to review</span>
-        <div class="stat-number">--</div>
+        <div class="stat-number" id="statReportsCount">--</div>
       </div>
     </div>
   </div>
@@ -58,7 +60,10 @@
     <div class="col-lg-8">
       <div class="panel-card">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">Recent placement activity</h5>
+          <div>
+            <h5 class="fw-bold mb-0">Student Applications & Placements</h5>
+            <small class="text-secondary" id="coordFilterSubtext">Review and decide on student applications</small>
+          </div>
           <button id="btnExportReportTop" class="btn btn-sm btn-outline-primary">Export CSV report</button>
         </div>
         <div class="table-responsive">
@@ -67,15 +72,16 @@
               <tr>
                 <th>Student</th>
                 <th>Programme</th>
-                <th>Organisation</th>
+                <th>Opportunity & Company</th>
                 <th>Status</th>
+                <th class="text-end">Coordinator Decision</th>
               </tr>
             </thead>
             <tbody id="coordinatorPlacementsTbody">
               <tr>
-                <td colspan="4" class="text-center py-4 text-secondary">
+                <td colspan="5" class="text-center py-4 text-secondary">
                   <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                  Loading live placement data...
+                  Loading student applications...
                 </td>
               </tr>
             </tbody>

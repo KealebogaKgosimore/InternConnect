@@ -95,7 +95,7 @@ BEGIN
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'),
     CASE
-      WHEN NEW.raw_user_meta_data->>'role' IN ('student', 'company')
+      WHEN NEW.raw_user_meta_data->>'role' IN ('student', 'company', 'coordinator')
         THEN NEW.raw_user_meta_data->>'role'
       ELSE 'student'
     END,
@@ -174,8 +174,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
--- Treat previously self-assignable privileged roles as untrusted until an administrator reassigns them.
-UPDATE public.profiles SET role = 'student' WHERE role IN ('coordinator', 'admin');
 DROP TRIGGER IF EXISTS prevent_profile_role_change ON public.profiles;
 CREATE TRIGGER prevent_profile_role_change
   BEFORE UPDATE OF role ON public.profiles
@@ -197,7 +195,7 @@ CREATE POLICY "Profiles visible to owner and relevant staff" ON public.profiles
     )
   );
 CREATE POLICY "Users can insert own profile" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id AND role IN ('student', 'company'));
+  FOR INSERT WITH CHECK (auth.uid() = id AND role IN ('student', 'company', 'coordinator'));
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);

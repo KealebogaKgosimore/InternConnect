@@ -175,17 +175,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const studentUniversitySelect = document.getElementById("studentUniversity");
     const otherInstitutionGroup = document.getElementById("otherInstitutionGroup");
     const otherInstitutionInput = document.getElementById("otherInstitution");
+    const institutionLabel = document.getElementById("institutionLabel");
     const companyOrganisationSelect = document.getElementById("companyOrganisationSelect");
     const otherCompanyGroup = document.getElementById("otherCompanyGroup");
     const otherCompanyInput = document.getElementById("otherCompanyInput");
     const hiddenOrganisation = document.getElementById("organisation");
 
     function updateOrganisationVisibility(role) {
-      if (role === "student") {
+      if (role === "student" || role === "coordinator") {
         if (defaultOrgGroup) defaultOrgGroup.classList.add("d-none");
         if (companyOrgGroup) companyOrgGroup.classList.add("d-none");
         if (studentOrgGroup) studentOrgGroup.classList.remove("d-none");
         if (studentUniversitySelect) studentUniversitySelect.required = true;
+        if (institutionLabel) {
+          institutionLabel.innerHTML = role === "coordinator"
+            ? 'University / Institution (Coordinator Workspace) <span class="text-danger">*</span>'
+            : 'Institution / University in Botswana <span class="text-danger">*</span>';
+        }
         if (companyOrganisationSelect) {
           companyOrganisationSelect.required = false;
           companyOrganisationSelect.value = "";
@@ -218,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function syncOrganisationValue() {
       if (!accountRoleSelect || !hiddenOrganisation) return;
       const role = accountRoleSelect.value;
-      if (role === "student") {
+      if (role === "student" || role === "coordinator") {
         const uni = studentUniversitySelect ? studentUniversitySelect.value : "";
         if (uni === "Other") {
           hiddenOrganisation.value = otherInstitutionInput ? otherInstitutionInput.value.trim() : "";
@@ -242,10 +248,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateOrganisationVisibility(e.target.value);
       });
 
-      // Handle URL parameter ?role=student or ?role=company
+      // Handle URL parameter ?role=student or ?role=company or ?role=coordinator
       const urlParams = new URLSearchParams(window.location.search);
       const preselectedRole = urlParams.get("role");
-      if (preselectedRole && ["student", "company"].includes(preselectedRole)) {
+      if (preselectedRole && ["student", "company", "coordinator"].includes(preselectedRole)) {
         accountRoleSelect.value = preselectedRole;
         updateOrganisationVisibility(preselectedRole);
       } else if (accountRoleSelect.value) {
@@ -326,19 +332,21 @@ document.addEventListener("DOMContentLoaded", () => {
       const password = document.getElementById("regPassword").value;
       const confirm = document.getElementById("confirmPassword").value;
 
-      if (!["student", "company"].includes(role)) {
+      if (!["student", "company", "coordinator"].includes(role)) {
         notice.className = "alert alert-warning";
-        notice.textContent = "Choose Student or Company / organisation. Coordinator and administrator accounts must be assigned by an administrator.";
+        notice.textContent = "Please choose an account type: Student, University coordinator, or Company / organisation.";
         notice.classList.remove("d-none");
         return;
       }
 
       let organisation = "";
-      if (role === "student") {
+      if (role === "student" || role === "coordinator") {
         const selectedUni = studentUniversitySelect ? studentUniversitySelect.value : "";
         if (!selectedUni) {
           notice.className = "alert alert-warning";
-          notice.textContent = "Please select your university or tertiary institution in Botswana.";
+          notice.textContent = role === "coordinator" 
+            ? "Please select the university or tertiary institution you oversee in Botswana."
+            : "Please select your university or tertiary institution in Botswana.";
           notice.classList.remove("d-none");
           studentUniversitySelect?.focus();
           return;

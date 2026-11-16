@@ -39,6 +39,7 @@
           <select id="accountRole" class="form-select" required>
             <option value="">Select account type</option>
             <option value="student">Student</option>
+            <option value="coordinator">University coordinator</option>
             <option value="company">Company / organisation</option>
           </select>
         </div>
@@ -59,9 +60,9 @@
           <input class="form-control" disabled placeholder="Please select an account type above">
         </div>
 
-        <!-- Student Institution Dropdown (Universities in Botswana) -->
+        <!-- Student / Coordinator Institution Dropdown (Universities in Botswana) -->
         <div class="col-12 d-none" id="studentOrgGroup">
-          <label for="studentUniversity" class="form-label">Institution / University in Botswana <span class="text-danger">*</span></label>
+          <label for="studentUniversity" class="form-label" id="institutionLabel">Institution / University in Botswana <span class="text-danger">*</span></label>
           <select id="studentUniversity" class="form-select">
             <option value="">Select your university / institution</option>
             <optgroup label="Public Universities & Colleges">
