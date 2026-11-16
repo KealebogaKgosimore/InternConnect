@@ -8,14 +8,17 @@ const CoordinatorDashboard = {
   profile: null,
   placements: [],
   reports: [],
+  institutionStudents: [],   // all students from coordinator's institution
 
   async init() {
     this.profile = await AuthManager.requireAuth(["coordinator", "admin"]);
     this.renderHeader();
     await this.loadPlacements();
+    await this.loadInstitutionStudents();
     await this.loadPlatformMetrics();
     this.setupActions();
     this.setupRealtime();
+    this.setupStudentSearch();
   },
 
   renderHeader() {
@@ -66,6 +69,7 @@ const CoordinatorDashboard = {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
           this.loadPlacements();
+          this.loadInstitutionStudents();
           this.loadPlatformMetrics();
         })
         .subscribe(status => setRealtimeStatus("coordinatorStatusAlert", status));
@@ -289,8 +293,143 @@ const CoordinatorDashboard = {
     }
   },
 
+  /**
+   * Load all students registered under this coordinator's institution.
+   * Shows every student regardless of whether they have applied to any internship.
+   */
+  async loadInstitutionStudents() {
+    const tbody = document.getElementById("institutionStudentsTbody");
+    const badge = document.getElementById("badgeStudentCount");
+    const client = getSupabase();
+    let students = [];
+
+    if (client && isConfigured()) {
+      try {
+        let query = client
+          .from("profiles")
+          .select("id, full_name, email, phone, programme, organisation, skills, cv_url")
+          .eq("role", "student")
+          .order("full_name", { ascending: true });
+
+        // Scope to coordinator's institution
+        if (this.profile?.organisation && this.profile.role !== "admin") {
+          query = query.ilike("organisation", `%${this.profile.organisation}%`);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) students = data;
+      } catch (err) {
+        console.warn("Could not fetch institution students:", err);
+      }
+    }
+
+    // Fallback: derive unique students from placements data if DB unavailable
+    if (students.length === 0 && this.placements.length > 0) {
+      const seen = new Set();
+      students = this.placements
+        .map(p => p.profiles)
+        .filter(s => s && !seen.has(s.id) && seen.add(s.id));
+    }
+
+    this.institutionStudents = students;
+    if (badge) badge.textContent = students.length;
+
+    const subtext = document.getElementById("studentsFilterSubtext");
+    if (subtext && this.profile?.organisation) {
+      subtext.textContent = `All ${students.length} registered student${students.length !== 1 ? "s" : ""} under ${this.profile.organisation}`;
+    }
+
+    this.renderStudentsTable(students);
+  },
+
+  renderStudentsTable(students) {
+    const tbody = document.getElementById("institutionStudentsTbody");
+    if (!tbody) return;
+
+    if (!students || students.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" class="text-center py-4 text-secondary">
+            No students from <strong>${this.profile?.organisation || "your institution"}</strong> are registered yet.
+            Once students sign up and select this institution, they will appear here.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Build a quick lookup: student id → their latest application status
+    const statusByStudent = {};
+    this.placements.forEach(app => {
+      const sid = app.profiles?.id || app.student_id;
+      if (sid) {
+        // Keep the most recent / highest-priority status
+        const priority = { accepted: 5, shortlisted: 4, under_review: 3, submitted: 2, rejected: 1 };
+        const existing = statusByStudent[sid];
+        if (!existing || (priority[app.status] || 0) > (priority[existing.status] || 0)) {
+          statusByStudent[sid] = { status: app.status, internship: app.internships };
+        }
+      }
+    });
+
+    tbody.innerHTML = students.map(s => {
+      const appInfo = statusByStudent[s.id];
+      let statusCell;
+      if (appInfo) {
+        statusCell = `
+          ${this.getStatusBadge(appInfo.status)}
+          <div class="small text-muted mt-1">${escapeHtml(appInfo.internship?.company_name || "")}</div>
+        `;
+      } else {
+        statusCell = `<span class="badge bg-light text-secondary border">No application yet</span>`;
+      }
+
+      return `
+        <tr class="student-row" data-name="${escapeHtml((s.full_name || "").toLowerCase())}" data-prog="${escapeHtml((s.programme || "").toLowerCase())}">
+          <td>
+            <div class="fw-semibold">${escapeHtml(s.full_name || "Student")}</div>
+            <span class="badge bg-light text-dark border mt-1">${escapeHtml(s.organisation || this.profile?.organisation || "")}</span>
+          </td>
+          <td>
+            <div class="small fw-semibold">${escapeHtml(s.programme || "—")}</div>
+            ${s.skills ? `<div class="small text-muted">${escapeHtml(s.skills)}</div>` : ""}
+          </td>
+          <td>
+            <div class="small">${escapeHtml(s.email || "")}</div>
+            ${s.phone ? `<div class="small text-muted">${escapeHtml(s.phone)}</div>` : ""}
+            ${s.cv_url ? `<a href="#" class="small text-primary d-block mt-1" data-resume-path="${escapeHtml(s.cv_url)}">View CV</a>` : ""}
+          </td>
+          <td>${statusCell}</td>
+        </tr>
+      `;
+    }).join("");
+
+    // Wire CV links in students table
+    tbody.querySelectorAll("[data-resume-path]").forEach(link => {
+      link.addEventListener("click", async e => {
+        e.preventDefault();
+        try { await openResume(link.dataset.resumePath); }
+        catch (err) { alert("Could not open CV: " + err.message); }
+      });
+    });
+  },
+
+  setupStudentSearch() {
+    const input = document.getElementById("studentSearchInput");
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const q = input.value.toLowerCase().trim();
+      const rows = document.querySelectorAll("#institutionStudentsTbody .student-row");
+      rows.forEach(row => {
+        const name = row.dataset.name || "";
+        const prog = row.dataset.prog || "";
+        row.style.display = (!q || name.includes(q) || prog.includes(q)) ? "" : "none";
+      });
+    });
+  },
+
   async loadPlatformMetrics() {
-    let studentCount = 0;
+    let studentCount = this.institutionStudents.length;
     let appCount = this.placements.length;
     let placementCount = this.placements.filter(p => p.status === "accepted").length;
     let reportCount = 0;
@@ -298,14 +437,6 @@ const CoordinatorDashboard = {
     const client = getSupabase();
     if (client && isConfigured()) {
       try {
-        // Count students belonging to this institution
-        let profileQuery = client.from("profiles").select("id", { count: "exact", head: true }).eq("role", "student");
-        if (this.profile?.organisation && this.profile.role !== "admin") {
-          profileQuery = profileQuery.ilike("organisation", `%${this.profile.organisation}%`);
-        }
-        const { count: stuCount } = await profileQuery;
-        if (stuCount !== null && stuCount > 0) studentCount = stuCount;
-
         // Count pending reports from students of this institution
         const { data: reports } = await client
           .from("progress_reports")
