@@ -84,6 +84,19 @@ const AuthManager = {
       } catch (upsertErr) {
         console.warn("Profile handled by database trigger or note:", upsertErr);
       }
+
+      // If registered as a company, automatically link existing unassigned opportunities matching this organisation
+      if (role === "company" && organisation) {
+        try {
+          await client
+            .from("internships")
+            .update({ company_id: data.user.id })
+            .ilike("company_name", organisation)
+            .is("company_id", null);
+        } catch (claimErr) {
+          console.warn("Auto-claim internships note:", claimErr);
+        }
+      }
     }
 
     return data;
@@ -162,7 +175,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const studentUniversitySelect = document.getElementById("studentUniversity");
     const otherInstitutionGroup = document.getElementById("otherInstitutionGroup");
     const otherInstitutionInput = document.getElementById("otherInstitution");
-    const companyOrganisationInput = document.getElementById("companyOrganisation");
+    const companyOrganisationSelect = document.getElementById("companyOrganisationSelect");
+    const otherCompanyGroup = document.getElementById("otherCompanyGroup");
+    const otherCompanyInput = document.getElementById("otherCompanyInput");
     const hiddenOrganisation = document.getElementById("organisation");
 
     function updateOrganisationVisibility(role) {
@@ -171,15 +186,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (companyOrgGroup) companyOrgGroup.classList.add("d-none");
         if (studentOrgGroup) studentOrgGroup.classList.remove("d-none");
         if (studentUniversitySelect) studentUniversitySelect.required = true;
-        if (companyOrganisationInput) {
-          companyOrganisationInput.required = false;
-          companyOrganisationInput.value = "";
+        if (companyOrganisationSelect) {
+          companyOrganisationSelect.required = false;
+          companyOrganisationSelect.value = "";
         }
+        if (otherCompanyGroup) otherCompanyGroup.classList.add("d-none");
+        if (otherCompanyInput) otherCompanyInput.value = "";
       } else if (role === "company") {
         if (defaultOrgGroup) defaultOrgGroup.classList.add("d-none");
         if (studentOrgGroup) studentOrgGroup.classList.add("d-none");
         if (companyOrgGroup) companyOrgGroup.classList.remove("d-none");
-        if (companyOrganisationInput) companyOrganisationInput.required = true;
+        if (companyOrganisationSelect) companyOrganisationSelect.required = true;
         if (studentUniversitySelect) {
           studentUniversitySelect.required = false;
           studentUniversitySelect.value = "";
@@ -191,8 +208,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (studentOrgGroup) studentOrgGroup.classList.add("d-none");
         if (companyOrgGroup) companyOrgGroup.classList.add("d-none");
         if (studentUniversitySelect) studentUniversitySelect.required = false;
-        if (companyOrganisationInput) companyOrganisationInput.required = false;
+        if (companyOrganisationSelect) companyOrganisationSelect.required = false;
         if (otherInstitutionGroup) otherInstitutionGroup.classList.add("d-none");
+        if (otherCompanyGroup) otherCompanyGroup.classList.add("d-none");
       }
       syncOrganisationValue();
     }
@@ -208,7 +226,12 @@ document.addEventListener("DOMContentLoaded", () => {
           hiddenOrganisation.value = uni;
         }
       } else if (role === "company") {
-        hiddenOrganisation.value = companyOrganisationInput ? companyOrganisationInput.value.trim() : "";
+        const comp = companyOrganisationSelect ? companyOrganisationSelect.value : "";
+        if (comp === "Other") {
+          hiddenOrganisation.value = otherCompanyInput ? otherCompanyInput.value.trim() : "";
+        } else {
+          hiddenOrganisation.value = comp;
+        }
       } else {
         hiddenOrganisation.value = "";
       }
@@ -247,8 +270,50 @@ document.addEventListener("DOMContentLoaded", () => {
       otherInstitutionInput.addEventListener("input", syncOrganisationValue);
     }
 
-    if (companyOrganisationInput) {
-      companyOrganisationInput.addEventListener("input", syncOrganisationValue);
+    if (companyOrganisationSelect) {
+      companyOrganisationSelect.addEventListener("change", (e) => {
+        if (e.target.value === "Other") {
+          if (otherCompanyGroup) otherCompanyGroup.classList.remove("d-none");
+          if (otherCompanyInput) otherCompanyInput.focus();
+        } else {
+          if (otherCompanyGroup) otherCompanyGroup.classList.add("d-none");
+          if (otherCompanyInput) otherCompanyInput.value = "";
+        }
+        syncOrganisationValue();
+      });
+    }
+
+    if (otherCompanyInput) {
+      otherCompanyInput.addEventListener("input", syncOrganisationValue);
+    }
+
+    // Populate extra company options if live Supabase contains more
+    if (typeof isConfigured === "function" && isConfigured()) {
+      (async () => {
+        try {
+          const client = getSupabase();
+          if (!client) return;
+          const { data } = await client.from("internships").select("company_name");
+          if (data && companyOrganisationSelect) {
+            const existing = new Set(
+              Array.from(companyOrganisationSelect.querySelectorAll("option")).map(o => o.value.toLowerCase().trim())
+            );
+            const group = companyOrganisationSelect.querySelector("optgroup") || companyOrganisationSelect;
+            data.forEach(item => {
+              const name = (item.company_name || "").trim();
+              if (name && !existing.has(name.toLowerCase())) {
+                existing.add(name.toLowerCase());
+                const opt = document.createElement("option");
+                opt.value = name;
+                opt.textContent = name;
+                group.appendChild(opt);
+              }
+            });
+          }
+        } catch (e) {
+          console.debug("Dynamic company options note:", e);
+        }
+      })();
     }
 
     registerForm.addEventListener("submit", async (e) => {
@@ -292,13 +357,26 @@ document.addEventListener("DOMContentLoaded", () => {
           organisation = selectedUni;
         }
       } else if (role === "company") {
-        organisation = companyOrganisationInput ? companyOrganisationInput.value.trim() : "";
-        if (!organisation) {
+        const selectedComp = companyOrganisationSelect ? companyOrganisationSelect.value : "";
+        if (!selectedComp) {
           notice.className = "alert alert-warning";
-          notice.textContent = "Please enter your company or organisation name.";
+          notice.textContent = "Please select your company or organisation in Botswana.";
           notice.classList.remove("d-none");
-          companyOrganisationInput?.focus();
+          companyOrganisationSelect?.focus();
           return;
+        }
+        if (selectedComp === "Other") {
+          const customComp = otherCompanyInput ? otherCompanyInput.value.trim() : "";
+          if (!customComp) {
+            notice.className = "alert alert-warning";
+            notice.textContent = "Please specify your company or organisation name.";
+            notice.classList.remove("d-none");
+            otherCompanyInput?.focus();
+            return;
+          }
+          organisation = customComp;
+        } else {
+          organisation = selectedComp;
         }
       } else {
         organisation = hiddenOrganisation ? hiddenOrganisation.value.trim() : "";

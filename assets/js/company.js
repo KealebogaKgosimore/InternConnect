@@ -60,15 +60,45 @@ const CompanyDashboard = {
     if (!client || !isConfigured()) return;
 
     try {
-      // 1. Fetch internships posted by this company (or all if company_id is null in preview)
-      const query = client.from("internships").select("*");
-      if (this.profile) {
-        query.or(`company_id.eq.${this.profile.id},company_id.is.null`);
+      // 1. If this company has existing unassigned seed/database listings, claim them automatically
+      if (this.profile?.id && this.profile?.organisation) {
+        try {
+          await client
+            .from("internships")
+            .update({ company_id: this.profile.id })
+            .ilike("company_name", this.profile.organisation)
+            .is("company_id", null);
+        } catch (claimErr) {
+          console.debug("Claim existing listings note:", claimErr);
+        }
+      }
+
+      // 2. Fetch internships posted by or matching this company
+      let query = client.from("internships").select("*");
+      if (this.profile?.id && this.profile?.organisation) {
+        query = query.or(`company_id.eq.${this.profile.id},company_name.ilike."${this.profile.organisation}"`);
+      } else if (this.profile?.id) {
+        query = query.eq("company_id", this.profile.id);
+      } else if (this.profile?.organisation) {
+        query = query.ilike("company_name", this.profile.organisation);
       }
       const { data: internships, error: intError } = await query.order("created_at", { ascending: false });
 
       if (intError) throw intError;
-      this.listings = internships || [];
+
+      if (internships && internships.length > 0) {
+        this.listings = internships;
+      } else if (this.profile?.organisation) {
+        // Fallback / preview mode: match with Botswana seed listings
+        const orgName = this.profile.organisation.toLowerCase().trim();
+        const fallbackMatches = (window.InternshipService?.fallbackListings || []).filter(item => {
+          const itemComp = (item.company_name || "").toLowerCase().trim();
+          return itemComp === orgName || itemComp.includes(orgName) || orgName.includes(itemComp);
+        });
+        this.listings = fallbackMatches;
+      } else {
+        this.listings = internships || [];
+      }
 
       // 2. Fetch applications for these listings
       const internshipIds = this.listings.map(l => l.id);

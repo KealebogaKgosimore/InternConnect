@@ -96,10 +96,40 @@
           </div>
         </div>
 
-        <!-- Company Organisation Input -->
+        <!-- Company Organisation Dropdown & Input -->
         <div class="col-12 d-none" id="companyOrgGroup">
-          <label for="companyOrganisation" class="form-label">Company / Organisation name <span class="text-danger">*</span></label>
-          <input id="companyOrganisation" class="form-control" placeholder="e.g. Debswana, Mascom, Stanbic Bank, your company name">
+          <label for="companyOrganisationSelect" class="form-label">Company / Organisation <span class="text-danger">*</span></label>
+          <select id="companyOrganisationSelect" class="form-select">
+            <option value="">Select your company / organisation in Botswana</option>
+            <optgroup label="Partner Organisations with Opportunities">
+              <option value="Botswana Digital & Innovation Hub (BDIH)">Botswana Digital & Innovation Hub (BDIH)</option>
+              <option value="Debswana Diamond Company">Debswana Diamond Company</option>
+              <option value="PricewaterhouseCoopers (PwC Botswana)">PricewaterhouseCoopers (PwC Botswana)</option>
+              <option value="Botswana Telecommunications Corporation (BTC)">Botswana Telecommunications Corporation (BTC)</option>
+              <option value="Botswana Agricultural Marketing Board (BAMB)">Botswana Agricultural Marketing Board (BAMB)</option>
+              <option value="Botswana Power Corporation (BPC)">Botswana Power Corporation (BPC)</option>
+              <option value="National Food Technology Research Centre (NFTRC)">National Food Technology Research Centre (NFTRC)</option>
+              <option value="Botswana Harvard Health Partnership (BHP)">Botswana Harvard Health Partnership (BHP)</option>
+              <option value="First National Bank Botswana (FNBB)">First National Bank Botswana (FNBB)</option>
+              <option value="Water Utilities Corporation (WUC)">Water Utilities Corporation (WUC)</option>
+              <option value="Department of Broadcasting Services (BTV)">Department of Broadcasting Services (BTV)</option>
+              <option value="Botswana Tourism Organisation (BTO)">Botswana Tourism Organisation (BTO)</option>
+              <option value="Bank of Botswana (BoB)">Bank of Botswana (BoB)</option>
+              <option value="Mascom Wireless">Mascom Wireless</option>
+              <option value="Khoemacau Copper Mining">Khoemacau Copper Mining</option>
+              <option value="Sir Ketumile Masire Teaching Hospital (SKMTH)">Sir Ketumile Masire Teaching Hospital (SKMTH)</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="Other">Other / New company (Not listed)</option>
+            </optgroup>
+          </select>
+          <div id="otherCompanyGroup" class="mt-2 d-none">
+            <label for="otherCompanyInput" class="form-label small text-secondary">Specify Company / Organisation name</label>
+            <input id="otherCompanyInput" class="form-control" placeholder="e.g. Absa Bank Botswana, Stanbic Bank, your company name">
+          </div>
+          <div class="form-text text-secondary mt-1">
+            Existing internship opportunities matching this organisation will automatically connect to your dashboard upon account creation.
+          </div>
         </div>
 
         <!-- Hidden input for backwards compatibility -->

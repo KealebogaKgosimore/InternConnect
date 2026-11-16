@@ -110,6 +110,15 @@ BEGIN
     role = EXCLUDED.role,
     phone = EXCLUDED.phone,
     organisation = EXCLUDED.organisation;
+
+  -- If user is a company, automatically link existing unassigned internships matching their organisation
+  IF (COALESCE(NEW.raw_user_meta_data->>'role', '') = 'company') AND COALESCE(NEW.raw_user_meta_data->>'organisation', '') <> '' THEN
+    UPDATE public.internships
+    SET company_id = NEW.id
+    WHERE (company_id IS NULL OR company_id = NEW.id)
+      AND LOWER(TRIM(company_name)) = LOWER(TRIM(NEW.raw_user_meta_data->>'organisation'));
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -140,6 +149,18 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.current_user_role() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.current_user_role() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.current_user_organisation()
+RETURNS TEXT
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT p.organisation FROM public.profiles AS p WHERE p.id = auth.uid()
+$$;
+REVOKE ALL ON FUNCTION public.current_user_organisation() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_organisation() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.prevent_profile_role_change()
 RETURNS trigger
@@ -195,7 +216,10 @@ CREATE POLICY "Companies can create internships" ON public.internships
   );
 CREATE POLICY "Companies can update own internships" ON public.internships
   FOR UPDATE USING (
-    (public.current_user_role() = 'company' AND company_id = auth.uid())
+    (public.current_user_role() = 'company' AND (
+      company_id = auth.uid() 
+      OR (company_id IS NULL AND LOWER(TRIM(company_name)) = LOWER(TRIM(public.current_user_organisation())))
+    ))
     OR public.current_user_role() IN ('coordinator', 'admin')
   ) WITH CHECK (
     (public.current_user_role() = 'company' AND company_id = auth.uid())
@@ -219,7 +243,11 @@ CREATE POLICY "Applications visible to relevant users" ON public.applications
     OR public.current_user_role() IN ('coordinator', 'admin')
     OR EXISTS (
       SELECT 1 FROM public.internships AS i
-      WHERE i.id = applications.internship_id AND i.company_id = auth.uid()
+      WHERE i.id = applications.internship_id 
+        AND (
+          i.company_id = auth.uid() 
+          OR (i.company_id IS NULL AND LOWER(TRIM(i.company_name)) = LOWER(TRIM(public.current_user_organisation())))
+        )
     )
   );
 CREATE POLICY "Students can apply to open internships" ON public.applications
