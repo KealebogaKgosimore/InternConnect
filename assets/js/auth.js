@@ -155,6 +155,102 @@ document.addEventListener("DOMContentLoaded", () => {
   const registerForm = document.getElementById("registerForm");
   if (registerForm) {
     const notice = document.getElementById("registerNotice");
+    const accountRoleSelect = document.getElementById("accountRole");
+    const defaultOrgGroup = document.getElementById("defaultOrgGroup");
+    const studentOrgGroup = document.getElementById("studentOrgGroup");
+    const companyOrgGroup = document.getElementById("companyOrgGroup");
+    const studentUniversitySelect = document.getElementById("studentUniversity");
+    const otherInstitutionGroup = document.getElementById("otherInstitutionGroup");
+    const otherInstitutionInput = document.getElementById("otherInstitution");
+    const companyOrganisationInput = document.getElementById("companyOrganisation");
+    const hiddenOrganisation = document.getElementById("organisation");
+
+    function updateOrganisationVisibility(role) {
+      if (role === "student") {
+        if (defaultOrgGroup) defaultOrgGroup.classList.add("d-none");
+        if (companyOrgGroup) companyOrgGroup.classList.add("d-none");
+        if (studentOrgGroup) studentOrgGroup.classList.remove("d-none");
+        if (studentUniversitySelect) studentUniversitySelect.required = true;
+        if (companyOrganisationInput) {
+          companyOrganisationInput.required = false;
+          companyOrganisationInput.value = "";
+        }
+      } else if (role === "company") {
+        if (defaultOrgGroup) defaultOrgGroup.classList.add("d-none");
+        if (studentOrgGroup) studentOrgGroup.classList.add("d-none");
+        if (companyOrgGroup) companyOrgGroup.classList.remove("d-none");
+        if (companyOrganisationInput) companyOrganisationInput.required = true;
+        if (studentUniversitySelect) {
+          studentUniversitySelect.required = false;
+          studentUniversitySelect.value = "";
+        }
+        if (otherInstitutionGroup) otherInstitutionGroup.classList.add("d-none");
+        if (otherInstitutionInput) otherInstitutionInput.value = "";
+      } else {
+        if (defaultOrgGroup) defaultOrgGroup.classList.remove("d-none");
+        if (studentOrgGroup) studentOrgGroup.classList.add("d-none");
+        if (companyOrgGroup) companyOrgGroup.classList.add("d-none");
+        if (studentUniversitySelect) studentUniversitySelect.required = false;
+        if (companyOrganisationInput) companyOrganisationInput.required = false;
+        if (otherInstitutionGroup) otherInstitutionGroup.classList.add("d-none");
+      }
+      syncOrganisationValue();
+    }
+
+    function syncOrganisationValue() {
+      if (!accountRoleSelect || !hiddenOrganisation) return;
+      const role = accountRoleSelect.value;
+      if (role === "student") {
+        const uni = studentUniversitySelect ? studentUniversitySelect.value : "";
+        if (uni === "Other") {
+          hiddenOrganisation.value = otherInstitutionInput ? otherInstitutionInput.value.trim() : "";
+        } else {
+          hiddenOrganisation.value = uni;
+        }
+      } else if (role === "company") {
+        hiddenOrganisation.value = companyOrganisationInput ? companyOrganisationInput.value.trim() : "";
+      } else {
+        hiddenOrganisation.value = "";
+      }
+    }
+
+    if (accountRoleSelect) {
+      accountRoleSelect.addEventListener("change", (e) => {
+        updateOrganisationVisibility(e.target.value);
+      });
+
+      // Handle URL parameter ?role=student or ?role=company
+      const urlParams = new URLSearchParams(window.location.search);
+      const preselectedRole = urlParams.get("role");
+      if (preselectedRole && ["student", "company"].includes(preselectedRole)) {
+        accountRoleSelect.value = preselectedRole;
+        updateOrganisationVisibility(preselectedRole);
+      } else if (accountRoleSelect.value) {
+        updateOrganisationVisibility(accountRoleSelect.value);
+      }
+    }
+
+    if (studentUniversitySelect) {
+      studentUniversitySelect.addEventListener("change", (e) => {
+        if (e.target.value === "Other") {
+          if (otherInstitutionGroup) otherInstitutionGroup.classList.remove("d-none");
+          if (otherInstitutionInput) otherInstitutionInput.focus();
+        } else {
+          if (otherInstitutionGroup) otherInstitutionGroup.classList.add("d-none");
+          if (otherInstitutionInput) otherInstitutionInput.value = "";
+        }
+        syncOrganisationValue();
+      });
+    }
+
+    if (otherInstitutionInput) {
+      otherInstitutionInput.addEventListener("input", syncOrganisationValue);
+    }
+
+    if (companyOrganisationInput) {
+      companyOrganisationInput.addEventListener("input", syncOrganisationValue);
+    }
+
     registerForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -162,7 +258,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const role = document.getElementById("accountRole").value;
       const email = document.getElementById("regEmail").value.trim();
       const phone = document.getElementById("phone").value.trim();
-      const organisation = document.getElementById("organisation").value.trim();
       const password = document.getElementById("regPassword").value;
       const confirm = document.getElementById("confirmPassword").value;
 
@@ -171,6 +266,46 @@ document.addEventListener("DOMContentLoaded", () => {
         notice.textContent = "Choose Student or Company / organisation. Coordinator and administrator accounts must be assigned by an administrator.";
         notice.classList.remove("d-none");
         return;
+      }
+
+      let organisation = "";
+      if (role === "student") {
+        const selectedUni = studentUniversitySelect ? studentUniversitySelect.value : "";
+        if (!selectedUni) {
+          notice.className = "alert alert-warning";
+          notice.textContent = "Please select your university or tertiary institution in Botswana.";
+          notice.classList.remove("d-none");
+          studentUniversitySelect?.focus();
+          return;
+        }
+        if (selectedUni === "Other") {
+          const customUni = otherInstitutionInput ? otherInstitutionInput.value.trim() : "";
+          if (!customUni) {
+            notice.className = "alert alert-warning";
+            notice.textContent = "Please specify your university or institution name.";
+            notice.classList.remove("d-none");
+            otherInstitutionInput?.focus();
+            return;
+          }
+          organisation = customUni;
+        } else {
+          organisation = selectedUni;
+        }
+      } else if (role === "company") {
+        organisation = companyOrganisationInput ? companyOrganisationInput.value.trim() : "";
+        if (!organisation) {
+          notice.className = "alert alert-warning";
+          notice.textContent = "Please enter your company or organisation name.";
+          notice.classList.remove("d-none");
+          companyOrganisationInput?.focus();
+          return;
+        }
+      } else {
+        organisation = hiddenOrganisation ? hiddenOrganisation.value.trim() : "";
+      }
+
+      if (hiddenOrganisation) {
+        hiddenOrganisation.value = organisation;
       }
 
       if (password !== confirm) {
@@ -196,6 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
         notice.classList.add("alert-success");
         notice.innerHTML = `<strong>Account created successfully!</strong> Check your email if verification is required, or <a href="login.html" class="alert-link">log in now</a>.`;
         registerForm.reset();
+        updateOrganisationVisibility("");
         setTimeout(() => {
           window.location.href = "login.html";
         }, 1800);

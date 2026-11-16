@@ -52,9 +52,10 @@ const StudentDashboard = {
     // Update status alert
     const statusAlert = document.getElementById("studentStatusAlert");
     if (statusAlert) {
+      const orgInfo = this.profile.organisation ? ` · Institution: <strong>${this.profile.organisation}</strong>` : "";
       statusAlert.innerHTML = `
         <span class="badge bg-secondary">● Connecting…</span>
-        <span>Signed in as <strong>${this.profile.full_name || "Student"}</strong> (${this.profile.email}) · Programme: <strong>${this.profile.programme || "Not specified"}</strong></span>
+        <span>Signed in as <strong>${this.profile.full_name || "Student"}</strong> (${this.profile.email}) · Programme: <strong>${this.profile.programme || "Not specified"}</strong>${orgInfo}</span>
       `;
     }
 
