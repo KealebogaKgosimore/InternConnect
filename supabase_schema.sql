@@ -385,70 +385,175 @@ END;
 $$;
 
 -- ====================================================================
--- SAMPLE SEED DATA (INITIAL INTERNSHIP LISTINGS)
+-- SAMPLE SEED DATA (AUTHENTIC BOTSWANA INTERNSHIP LISTINGS)
+-- Opportunities aligned with courses at UB, BIUST, BAC, BUAN, Botho, Limkokwing, etc.
 -- ====================================================================
 CREATE UNIQUE INDEX IF NOT EXISTS uq_internships_title_company ON public.internships (title, company_name);
+
+-- Clean up older placeholder demo records if they exist
+DELETE FROM public.internships 
+WHERE company_name IN ('TechBridge Botswana', 'Pula Advisory', 'Northstar Engineering', 'Kgalagadi Creative', 'BluePeak Systems', 'PixelWorks Digital');
 
 INSERT INTO public.internships (company_name, title, field, location, duration, required_skills, description, status)
 VALUES
   (
-    'TechBridge Botswana',
-    'Software Development Intern',
+    'Botswana Digital & Innovation Hub (BDIH)',
+    'Graduate Software Development Intern',
     'Information Technology',
     'Gaborone',
     '6 months',
-    'Java, SQL, HTML5, Web Development, JavaScript',
-    'Support our development team with web applications, automated testing, API integrations, and database operations.',
+    'Java, Python, SQL, Web Development, JavaScript, Git',
+    'Work at the Science and Technology Park supporting national digital transformation projects, civic tech web platforms, and REST API development for Botswana innovators.',
     'open'
   ),
   (
-    'Pula Advisory',
-    'Finance Assistant Intern',
+    'Debswana Diamond Company',
+    'Mining & Geotechnical Engineering Trainee',
+    'Engineering',
+    'Jwaneng',
+    '6 months',
+    'Mining Engineering, AutoCAD, Rock Mechanics, Safety Compliance, Data Analysis',
+    'Join the Jwaneng Mine open-pit and cut-9 geotechnical team. Assist with slope stability monitoring, blast fragmentation analysis, and mine planning documentation.',
+    'open'
+  ),
+  (
+    'PricewaterhouseCoopers (PwC Botswana)',
+    'Financial Analysis & Audit Trainee',
     'Finance',
     'Gaborone',
-    '3 months',
-    'Excel, Financial Reporting, Financial Analysis, Accounting',
-    'Assist with financial record auditing, spreadsheet financial modelling, and monthly compliance reporting.',
+    '6 months',
+    'Excel, Financial Reporting, Auditing, IFRS, Accounting, Analytical Thinking',
+    'Assist statutory audit teams in testing financial internal controls, verifying balance sheet reconciliations, and preparing client working papers in line with IFRS.',
     'open'
   ),
   (
-    'Northstar Engineering',
-    'Engineering Trainee',
+    'Botswana Telecommunications Corporation (BTC)',
+    'Network Operations & Cyber Systems Intern',
+    'Information Technology',
+    'Gaborone',
+    '6 months',
+    'Networking, Cisco, Linux, Network Security, Troubleshooting, TCP/IP',
+    'Support BTC''s Network Operations Centre (NOC). Assist in monitoring national optical fibre backbones, router configurations, subscriber IP assignments, and telemetry.',
+    'open'
+  ),
+  (
+    'Botswana Agricultural Marketing Board (BAMB)',
+    'Agribusiness & Grain Operations Intern',
+    'Agriculture',
+    'Gaborone',
+    '6 months',
+    'Agribusiness, Crop Science, Inventory Management, Quality Inspection, Supply Chain',
+    'Assist in the procurement, grade certification, and strategic silo storage management for domestic sorghum, maize, and pulse crops across BAMB national depots.',
+    'open'
+  ),
+  (
+    'Botswana Power Corporation (BPC)',
+    'Electrical & Generation Trainee',
+    'Engineering',
+    'Palapye',
+    '6 months',
+    'Electrical Engineering, High Voltage, PLC, Power Systems, CAD, Maintenance',
+    'Stationed near the Morupule power generation hub. Assist transmission engineers with substation inspections, switchgear testing, and SCADA monitoring protocols.',
+    'open'
+  ),
+  (
+    'National Food Technology Research Centre (NFTRC)',
+    'Food Technology & Quality Assurance Intern',
+    'Agriculture',
+    'Kanye',
+    '6 months',
+    'Food Science, Microbiology, Laboratory Testing, HACCP, Food Safety, Chemistry',
+    'Conduct laboratory analyses on indigenous food formulations, nutritional profiling, post-harvest processing, and food hygiene quality standards compliance.',
+    'open'
+  ),
+  (
+    'Botswana Harvard Health Partnership (BHP)',
+    'Biomedical Laboratory Research Intern',
+    'Health Sciences',
+    'Gaborone',
+    '6 months',
+    'Laboratory Techniques, PCR, Biomedical Sciences, Biosafety, Data Recording',
+    'Support research laboratory teams based at Princess Marina Hospital conducting genomic diagnostics, clinical trial sample processing, and epidemiological data entry.',
+    'open'
+  ),
+  (
+    'First National Bank Botswana (FNBB)',
+    'FinTech Solutions & Mobile Banking Intern',
+    'Information Technology',
+    'Gaborone',
+    '6 months',
+    'SQL, Python, FinTech, API Integrations, Mobile Apps, Cybersecurity, Problem Solving',
+    'Collaborate with FNBB''s Digital Innovation wing on cardless payment channels, e-Wallet services enhancements, fraud transaction pattern detection, and merchant integrations.',
+    'open'
+  ),
+  (
+    'Water Utilities Corporation (WUC)',
+    'Civil & Hydraulics Infrastructure Intern',
     'Engineering',
     'Francistown',
     '6 months',
-    'CAD, AutoCAD, Technical Design, Problem Solving',
-    'Work alongside senior structural and mechanical engineers on project documentation, site inspection, and technical design tasks.',
+    'Civil Engineering, Hydraulics, GIS, AutoCAD, Pipeline Design, Water Quality',
+    'Assist civil engineers overseeing northern water network expansion, reservoir pump stations, leak detection telemetry, and rural reticulation upgrades.',
     'open'
   ),
   (
-    'Kgalagadi Creative',
-    'Digital Marketing Intern',
-    'Marketing',
-    'Remote',
-    '3 months',
-    'Social Media, Content Creation, Analytics, Copywriting',
-    'Help plan digital media schedules, track audience engagement, create promotional graphics, and assist with online campaigns.',
+    'Department of Broadcasting Services (BTV)',
+    'Digital Broadcasting & Media Production Trainee',
+    'Media & Marketing',
+    'Gaborone',
+    '4 months',
+    'Video Editing, Camera Operation, Audio Production, Adobe Premiere, Graphic Design, Storytelling',
+    'Work hands-on within BTV newsrooms and recording studios, aiding camera operators, video montage editors, and broadcast sound technicians on daily live programming.',
     'open'
   ),
   (
-    'BluePeak Systems',
-    'IT Support Intern',
-    'Information Technology',
+    'Botswana Tourism Organisation (BTO)',
+    'Eco-Tourism & Wildlife Research Intern',
+    'Environmental & Tourism',
+    'Maun',
+    '6 months',
+    'Tourism Management, Environmental Science, GIS, Research, Hospitality, Wildlife Conservation',
+    'Based in the Okavango Delta tourism gateway. Participate in eco-accreditation audits, wildlife concession mapping, and destination marketing data collation.',
+    'open'
+  ),
+  (
+    'Bank of Botswana (BoB)',
+    'Economic Research & Monetary Policy Intern',
+    'Finance',
     'Gaborone',
     '6 months',
-    'Networking, Troubleshooting, Windows Server, Linux, Helpdesk',
-    'Provide technical support for enterprise hardware and network systems, troubleshooting user workstations and managing asset tracking.',
+    'Economics, Econometrics, Financial Modelling, Statistics, Excel, Research',
+    'Assist the Research and Financial Stability department in collecting macro-economic indicators, inflation forecasting data, and banking sector balance sheet statistics.',
     'open'
   ),
   (
-    'PixelWorks Digital',
-    'Junior Web & UI Intern',
-    'Information Technology',
-    'Remote',
+    'Mascom Wireless',
+    'Telecommunications & Digital Marketing Intern',
+    'Media & Marketing',
+    'Gaborone',
     '4 months',
-    'HTML5, CSS3, UI/UX, Figma, JavaScript, Responsive Design',
-    'Collaborate with designers and front-end developers to craft interactive web layouts and modernize user interfaces.',
+    'Digital Marketing, Social Media Analytics, Content Creation, Graphic Design, Copywriting',
+    'Assist Mascom''s marketing and communications unit with youth consumer campaign rollouts, digital subscriber engagement analysis, and brand collateral preparation.',
+    'open'
+  ),
+  (
+    'Khoemacau Copper Mining',
+    'Mineral Processing & Metallurgical Trainee',
+    'Engineering',
+    'Maun',
+    '6 months',
+    'Metallurgy, Mineral Processing, Chemical Analysis, Plant Operations, Safety',
+    'Work at the Zone 5 processing facility near Toteng assisting plant metallurgists with flotation circuit sampling, copper-silver concentrate recovery, and assay testing.',
+    'open'
+  ),
+  (
+    'Sir Ketumile Masire Teaching Hospital (SKMTH)',
+    'Health Informatics & Hospital Systems Trainee',
+    'Health Sciences',
+    'Gaborone',
+    '6 months',
+    'Health Informatics, Data Management, Medical Records, Confidentiality, Hospital Systems',
+    'Support clinical documentation workflows, digital patient management systems, and medical registry reporting at the national quaternary referral hospital.',
     'open'
   )
 ON CONFLICT (title, company_name) DO NOTHING;

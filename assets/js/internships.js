@@ -11,52 +11,196 @@ const InternshipService = {
   // Initial mock listings fallback if Supabase is offline or not configured yet
   fallbackListings: [
     {
-      id: "mock-1",
-      title: "Software Development Intern",
-      company_name: "TechBridge Botswana",
+      id: "bw-1",
+      title: "Graduate Software Development Intern",
+      company_name: "Botswana Digital & Innovation Hub (BDIH)",
       field: "Information Technology",
       location: "Gaborone",
       duration: "6 months",
-      required_skills: "Java, SQL, HTML5, Web Development, JavaScript",
-      description: "Support our development team with web applications, automated testing, API integrations, and database operations.",
+      required_skills: "Java, Python, SQL, Web Development, JavaScript, Git",
+      description: "Work at the Science and Technology Park supporting national digital transformation projects, civic tech web platforms, and REST API development for Botswana innovators.",
+      status: "open",
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString()
+    },
+    {
+      id: "bw-2",
+      title: "Mining & Geotechnical Engineering Trainee",
+      company_name: "Debswana Diamond Company",
+      field: "Engineering",
+      location: "Jwaneng",
+      duration: "6 months",
+      required_skills: "Mining Engineering, AutoCAD, Rock Mechanics, Safety Compliance, Data Analysis",
+      description: "Join the Jwaneng Mine open-pit and cut-9 geotechnical team. Assist with slope stability monitoring, blast fragmentation analysis, and mine planning documentation.",
       status: "open",
       created_at: new Date(Date.now() - 2 * 86400000).toISOString()
     },
     {
-      id: "mock-2",
-      title: "Finance Assistant Intern",
-      company_name: "Pula Advisory",
+      id: "bw-3",
+      title: "Financial Analysis & Audit Trainee",
+      company_name: "PricewaterhouseCoopers (PwC Botswana)",
       field: "Finance",
       location: "Gaborone",
-      duration: "3 months",
-      required_skills: "Excel, Financial Reporting, Financial Analysis, Accounting",
-      description: "Assist with financial record auditing, spreadsheet financial modelling, and monthly compliance reporting.",
+      duration: "6 months",
+      required_skills: "Excel, Financial Reporting, Auditing, IFRS, Accounting, Analytical Thinking",
+      description: "Assist statutory audit teams in testing financial internal controls, verifying balance sheet reconciliations, and preparing client working papers in line with IFRS.",
+      status: "open",
+      created_at: new Date(Date.now() - 3 * 86400000).toISOString()
+    },
+    {
+      id: "bw-4",
+      title: "Network Operations & Cyber Systems Intern",
+      company_name: "Botswana Telecommunications Corporation (BTC)",
+      field: "Information Technology",
+      location: "Gaborone",
+      duration: "6 months",
+      required_skills: "Networking, Cisco, Linux, Network Security, Troubleshooting, TCP/IP",
+      description: "Support BTC's Network Operations Centre (NOC). Assist in monitoring national optical fibre backbones, router configurations, subscriber IP assignments, and telemetry.",
       status: "open",
       created_at: new Date(Date.now() - 4 * 86400000).toISOString()
     },
     {
-      id: "mock-3",
-      title: "Engineering Trainee",
-      company_name: "Northstar Engineering",
-      field: "Engineering",
-      location: "Francistown",
+      id: "bw-5",
+      title: "Agribusiness & Grain Operations Intern",
+      company_name: "Botswana Agricultural Marketing Board (BAMB)",
+      field: "Agriculture",
+      location: "Gaborone",
       duration: "6 months",
-      required_skills: "CAD, AutoCAD, Technical Design, Problem Solving",
-      description: "Work alongside senior structural and mechanical engineers on project documentation, site inspection, and technical design tasks.",
+      required_skills: "Agribusiness, Crop Science, Inventory Management, Quality Inspection, Supply Chain",
+      description: "Assist in the procurement, grade certification, and strategic silo storage management for domestic sorghum, maize, and pulse crops across BAMB national depots.",
+      status: "open",
+      created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+    },
+    {
+      id: "bw-6",
+      title: "Electrical & Generation Trainee",
+      company_name: "Botswana Power Corporation (BPC)",
+      field: "Engineering",
+      location: "Palapye",
+      duration: "6 months",
+      required_skills: "Electrical Engineering, High Voltage, PLC, Power Systems, CAD, Maintenance",
+      description: "Stationed near the Morupule power generation hub. Assist transmission engineers with substation inspections, switchgear testing, and SCADA monitoring protocols.",
+      status: "open",
+      created_at: new Date(Date.now() - 5 * 86400000).toISOString()
+    },
+    {
+      id: "bw-7",
+      title: "Food Technology & Quality Assurance Intern",
+      company_name: "National Food Technology Research Centre (NFTRC)",
+      field: "Agriculture",
+      location: "Kanye",
+      duration: "6 months",
+      required_skills: "Food Science, Microbiology, Laboratory Testing, HACCP, Food Safety, Chemistry",
+      description: "Conduct laboratory analyses on indigenous food formulations, nutritional profiling, post-harvest processing, and food hygiene quality standards compliance.",
+      status: "open",
+      created_at: new Date(Date.now() - 6 * 86400000).toISOString()
+    },
+    {
+      id: "bw-8",
+      title: "Biomedical Laboratory Research Intern",
+      company_name: "Botswana Harvard Health Partnership (BHP)",
+      field: "Health Sciences",
+      location: "Gaborone",
+      duration: "6 months",
+      required_skills: "Laboratory Techniques, PCR, Biomedical Sciences, Biosafety, Data Recording",
+      description: "Support research laboratory teams based at Princess Marina Hospital conducting genomic diagnostics, clinical trial sample processing, and epidemiological data entry.",
       status: "open",
       created_at: new Date(Date.now() - 7 * 86400000).toISOString()
     },
     {
-      id: "mock-4",
-      title: "Digital Marketing Intern",
-      company_name: "Kgalagadi Creative",
-      field: "Marketing",
-      location: "Remote",
-      duration: "3 months",
-      required_skills: "Social Media, Content Creation, Analytics, Copywriting",
-      description: "Help plan digital media schedules, track audience engagement, create promotional graphics, and assist with online campaigns.",
+      id: "bw-9",
+      title: "FinTech Solutions & Mobile Banking Intern",
+      company_name: "First National Bank Botswana (FNBB)",
+      field: "Information Technology",
+      location: "Gaborone",
+      duration: "6 months",
+      required_skills: "SQL, Python, FinTech, API Integrations, Mobile Apps, Cybersecurity, Problem Solving",
+      description: "Collaborate with FNBB's Digital Innovation wing on cardless payment channels, e-Wallet services enhancements, fraud transaction pattern detection, and merchant integrations.",
+      status: "open",
+      created_at: new Date(Date.now() - 7 * 86400000).toISOString()
+    },
+    {
+      id: "bw-10",
+      title: "Civil & Hydraulics Infrastructure Intern",
+      company_name: "Water Utilities Corporation (WUC)",
+      field: "Engineering",
+      location: "Francistown",
+      duration: "6 months",
+      required_skills: "Civil Engineering, Hydraulics, GIS, AutoCAD, Pipeline Design, Water Quality",
+      description: "Assist civil engineers overseeing northern water network expansion, reservoir pump stations, leak detection telemetry, and rural reticulation upgrades.",
       status: "open",
       created_at: new Date(Date.now() - 8 * 86400000).toISOString()
+    },
+    {
+      id: "bw-11",
+      title: "Digital Broadcasting & Media Production Trainee",
+      company_name: "Department of Broadcasting Services (BTV)",
+      field: "Media & Marketing",
+      location: "Gaborone",
+      duration: "4 months",
+      required_skills: "Video Editing, Camera Operation, Audio Production, Adobe Premiere, Graphic Design, Storytelling",
+      description: "Work hands-on within BTV newsrooms and recording studios, aiding camera operators, video montage editors, and broadcast sound technicians on daily live programming.",
+      status: "open",
+      created_at: new Date(Date.now() - 9 * 86400000).toISOString()
+    },
+    {
+      id: "bw-12",
+      title: "Eco-Tourism & Wildlife Research Intern",
+      company_name: "Botswana Tourism Organisation (BTO)",
+      field: "Environmental & Tourism",
+      location: "Maun",
+      duration: "6 months",
+      required_skills: "Tourism Management, Environmental Science, GIS, Research, Hospitality, Wildlife Conservation",
+      description: "Based in the Okavango Delta tourism gateway. Participate in eco-accreditation audits, wildlife concession mapping, and destination marketing data collation.",
+      status: "open",
+      created_at: new Date(Date.now() - 10 * 86400000).toISOString()
+    },
+    {
+      id: "bw-13",
+      title: "Economic Research & Monetary Policy Intern",
+      company_name: "Bank of Botswana (BoB)",
+      field: "Finance",
+      location: "Gaborone",
+      duration: "6 months",
+      required_skills: "Economics, Econometrics, Financial Modelling, Statistics, Excel, Research",
+      description: "Assist the Research and Financial Stability department in collecting macro-economic indicators, inflation forecasting data, and banking sector balance sheet statistics.",
+      status: "open",
+      created_at: new Date(Date.now() - 11 * 86400000).toISOString()
+    },
+    {
+      id: "bw-14",
+      title: "Telecommunications & Digital Marketing Intern",
+      company_name: "Mascom Wireless",
+      field: "Media & Marketing",
+      location: "Gaborone",
+      duration: "4 months",
+      required_skills: "Digital Marketing, Social Media Analytics, Content Creation, Graphic Design, Copywriting",
+      description: "Assist Mascom's marketing and communications unit with youth consumer campaign rollouts, digital subscriber engagement analysis, and brand collateral preparation.",
+      status: "open",
+      created_at: new Date(Date.now() - 12 * 86400000).toISOString()
+    },
+    {
+      id: "bw-15",
+      title: "Mineral Processing & Metallurgical Trainee",
+      company_name: "Khoemacau Copper Mining",
+      field: "Engineering",
+      location: "Maun",
+      duration: "6 months",
+      required_skills: "Metallurgy, Mineral Processing, Chemical Analysis, Plant Operations, Safety",
+      description: "Work at the Zone 5 processing facility near Toteng assisting plant metallurgists with flotation circuit sampling, copper-silver concentrate recovery, and assay testing.",
+      status: "open",
+      created_at: new Date(Date.now() - 13 * 86400000).toISOString()
+    },
+    {
+      id: "bw-16",
+      title: "Health Informatics & Hospital Systems Trainee",
+      company_name: "Sir Ketumile Masire Teaching Hospital (SKMTH)",
+      field: "Health Sciences",
+      location: "Gaborone",
+      duration: "6 months",
+      required_skills: "Health Informatics, Data Management, Medical Records, Confidentiality, Hospital Systems",
+      description: "Support clinical documentation workflows, digital patient management systems, and medical registry reporting at the national quaternary referral hospital.",
+      status: "open",
+      created_at: new Date(Date.now() - 14 * 86400000).toISOString()
     }
   ],
 
@@ -236,7 +380,9 @@ const InternshipService = {
       let filtered = this.allInternships.filter(item => {
         const fullSearchable = `${item.title} ${item.company_name} ${item.field} ${item.location} ${item.required_skills} ${item.description}`.toLowerCase();
         const matchesTerm = !term || fullSearchable.includes(term);
-        const matchesField = !field || item.field === field;
+        const itemField = (item.field || "").toLowerCase();
+        const filterField = field.toLowerCase();
+        const matchesField = !field || itemField === filterField || itemField.includes(filterField) || filterField.includes(itemField);
         const matchesLoc = !loc || item.location.toLowerCase().includes(loc.toLowerCase());
         return matchesTerm && matchesField && matchesLoc;
       });
